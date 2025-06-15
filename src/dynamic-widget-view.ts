@@ -74,16 +74,25 @@ export class DynamicWidgetView extends ItemView {
 	private makeUlLinkList(list: TFile[] | undefined): Element {
 		if (!list || list.length === 0) return document.createElement("div");
 		const ulEl = document.createElement("ul");
+		const activeFile = this.app.workspace.getActiveFile();
+
 		const liEls = list.map((project) => {
 			const projectEl = document.createElement("li");
+
+			if (activeFile && activeFile.path === project.path) {
+				projectEl.createEl("span", {
+					text: project.basename,
+					cls: "dynamic-widget-active-file",
+				});
+				return projectEl;
+			}
+
 			const metadata = this.app.metadataCache.getFileCache(project);
 			const linkEl = projectEl.createEl("a", {
 				text: metadata?.frontmatter?.title || project.basename,
-				href: "#",
 			});
 			linkEl.addEventListener("click", (event) => {
 				event.preventDefault();
-				event.stopPropagation();
 				this.app.workspace.getLeaf("tab").openFile(project);
 			});
 			return projectEl;
