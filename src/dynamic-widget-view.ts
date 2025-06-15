@@ -162,13 +162,20 @@ export class DynamicWidgetView extends ItemView {
 				// Update when any file with the same area is moved
 				const activeFile = this.app.workspace.getActiveFile();
 				if (activeFile) {
-					const metadata = this.app.metadataCache.getFileCache(activeFile);
+					const metadata =
+						this.app.metadataCache.getFileCache(activeFile);
 					const currentArea = metadata?.frontmatter?.area;
 					if (currentArea) {
-						const movedFileMetadata = this.app.metadataCache.getFileCache(file);
-						const movedFileArea = movedFileMetadata?.frontmatter?.area;
+						const movedFileMetadata =
+							this.app.metadataCache.getFileCache(file);
+						const movedFileArea =
+							movedFileMetadata?.frontmatter?.area;
 						// Update if the moved file shares the same area
-						if (movedFileArea && movedFileArea.replace(/\[\[|\]\]/g, "") === currentArea.replace(/\[\[|\]\]/g, "")) {
+						if (
+							movedFileArea &&
+							movedFileArea.replace(/\[\[|\]\]/g, "") ===
+								currentArea.replace(/\[\[|\]\]/g, "")
+						) {
 							this.updateContent();
 						}
 					}
@@ -182,7 +189,8 @@ export class DynamicWidgetView extends ItemView {
 				// Update when any file with the same area is deleted
 				const activeFile = this.app.workspace.getActiveFile();
 				if (activeFile) {
-					const metadata = this.app.metadataCache.getFileCache(activeFile);
+					const metadata =
+						this.app.metadataCache.getFileCache(activeFile);
 					const currentArea = metadata?.frontmatter?.area;
 					if (currentArea) {
 						// Since the file is deleted, we can't check its metadata
