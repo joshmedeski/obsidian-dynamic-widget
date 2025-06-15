@@ -1,78 +1,11 @@
-import { ItemView, Plugin, WorkspaceLeaf } from "obsidian";
-
-export const VIEW_TYPE_DYNAMIC_WIDGET = "dynamic-widget-view";
-
-interface DynamicWidgetSettings {
-	mySetting: string;
-}
-
-const DEFAULT_SETTINGS: DynamicWidgetSettings = {
-	mySetting: "default",
-};
-
-export class DynamicWidgetView extends ItemView {
-	constructor(leaf: WorkspaceLeaf) {
-		super(leaf);
-	}
-
-	getViewType(): string {
-		return VIEW_TYPE_DYNAMIC_WIDGET;
-	}
-
-	getDisplayText(): string {
-		return "Dynamic Widget";
-	}
-
-	async onOpen(): Promise<void> {
-		const container = this.containerEl.children[1];
-		container.empty();
-		container.addClass("dynamic-widget-container");
-
-		const content = container.createEl("div", {
-			cls: "dynamic-widget-content",
-		});
-
-		content.createEl("h4", {
-			text: "Dynamic Widget",
-			cls: "dynamic-widget-title",
-		});
-
-		const infoEl = content.createEl("div", { cls: "dynamic-widget-info" });
-		infoEl.createEl("p", { text: "This is your dynamic widget!" });
-
-		const currentTime = content.createEl("div", {
-			cls: "dynamic-widget-time",
-		});
-		currentTime.createEl("strong", { text: "Current Time: " });
-		currentTime.createEl("span", {
-			text: new Date().toLocaleTimeString(),
-			cls: "time-display",
-		});
-
-		const actionButton = content.createEl("button", {
-			text: "Refresh",
-			cls: "dynamic-widget-button",
-		});
-
-		actionButton.addEventListener("click", () => {
-			const timeSpan = currentTime.querySelector(".time-display");
-			if (timeSpan) {
-				timeSpan.textContent = new Date().toLocaleTimeString();
-			}
-		});
-	}
-
-	async onClose(): Promise<void> {
-		// Cleanup when view is closed
-	}
-}
+import { Plugin } from "obsidian";
+import {
+	DynamicWidgetView,
+	VIEW_TYPE_DYNAMIC_WIDGET,
+} from "./src/dynamic-widget-view";
 
 export default class DynamicWidget extends Plugin {
-	settings: DynamicWidgetSettings;
-
 	async onload() {
-		await this.loadSettings();
-
 		// Register the dynamic widget view
 		this.registerView(
 			VIEW_TYPE_DYNAMIC_WIDGET,
@@ -117,17 +50,5 @@ export default class DynamicWidget extends Plugin {
 	onunload() {
 		// Clean up the view when plugin is disabled
 		this.app.workspace.detachLeavesOfType(VIEW_TYPE_DYNAMIC_WIDGET);
-	}
-
-	async loadSettings() {
-		this.settings = Object.assign(
-			{},
-			DEFAULT_SETTINGS,
-			await this.loadData(),
-		);
-	}
-
-	async saveSettings() {
-		await this.saveData(this.settings);
 	}
 }
