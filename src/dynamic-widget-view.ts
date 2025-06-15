@@ -79,10 +79,12 @@ export class DynamicWidgetView extends ItemView {
 			const metadata = this.app.metadataCache.getFileCache(project);
 			const linkEl = projectEl.createEl("a", {
 				text: metadata?.frontmatter?.title || project.basename,
+				href: "#",
 			});
 			linkEl.addEventListener("click", (event) => {
 				event.preventDefault();
-				this.app.workspace.getLeaf().openFile(project);
+				event.stopPropagation();
+				this.app.workspace.getLeaf("tab").openFile(project);
 			});
 			return projectEl;
 		});
