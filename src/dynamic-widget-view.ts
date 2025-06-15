@@ -1,4 +1,4 @@
-import { ItemView, WorkspaceLeaf, TFile, CachedMetadata } from "obsidian";
+import { ItemView, WorkspaceLeaf, TFile } from "obsidian";
 
 export const VIEW_TYPE_DYNAMIC_WIDGET = "dynamic-widget-view";
 
@@ -43,33 +43,47 @@ export class DynamicWidgetView extends ItemView {
 		return activeFile.basename;
 	}
 
-	private getProjectList(): Element {
-		const projectList = document.createElement("ul");
-		const activeProjectNotes = this.app.vault
-			.getFiles()
-			.filter((file) => {
-				return (
-					file.path.startsWith("Projects 🏔️/Active ✅") &&
-					file.extension === "md"
-				);
-			})
-			.map((project) => {
-				const projectEl = document.createElement("li");
-				const metadata = this.app.metadataCache.getFileCache(project);
-				projectEl.createEl("a", {
-					text: metadata?.frontmatter?.title || project.basename,
-					href: this.app.vault.getResourcePath(project),
-				});
-				return projectEl;
+	private makeUlLinkList(list: TFile[] | undefined): Element {
+		if (!list || list.length === 0) return document.createElement("div");
+		const ulEl = document.createElement("ul");
+		const liEls = list.map((project) => {
+			const projectEl = document.createElement("li");
+			const metadata = this.app.metadataCache.getFileCache(project);
+			const linkEl = projectEl.createEl("a", {
+				text: metadata?.frontmatter?.title || project.basename,
 			});
-		activeProjectNotes.forEach((el) => projectList.appendChild(el));
-		if (activeProjectNotes.length === 0) {
-			projectList.createEl("li", {
-				text: "No active projects found",
-				cls: "dynamic-widget-no-projects",
+			linkEl.addEventListener("click", (event) => {
+				event.preventDefault();
+				this.app.workspace.getLeaf().openFile(project);
 			});
-		}
-		return projectList;
+			return projectEl;
+		});
+		liEls.forEach((el) => ulEl.appendChild(el));
+		return ulEl;
+	}
+
+	private getActiveProjects(): Element {
+		const activeProjectNotes = this.app.vault.getFiles().filter((file) => {
+			return (
+				file.path.startsWith("Projects 🏔️/Active ✅") &&
+				file.extension === "md"
+			);
+		});
+		return this.makeUlLinkList(activeProjectNotes);
+	}
+
+	private getProjectsByArea(area: string): Element {
+		const areaNotes = this.app.vault.getFiles().filter((file) => {
+			const metadata = this.app.metadataCache.getFileCache(file);
+			const areaFrontmatter = metadata?.frontmatter?.area;
+			if (!areaFrontmatter) return false;
+			console.log("Area Frontmatter:", areaFrontmatter);
+			if (Array.isArray(areaFrontmatter)) {
+				return areaFrontmatter.includes(area);
+			}
+			return areaFrontmatter.replace(/\[\[|\]\]/g, "") === area;
+		});
+		return this.makeUlLinkList(areaNotes);
 	}
 
 	async onOpen(): Promise<void> {
@@ -133,15 +147,20 @@ export class DynamicWidgetView extends ItemView {
 			return;
 		}
 
-		// File info section
-		const infoEl = this.contentEl.createEl("div", {
-			cls: "dynamic-widget-info",
-		});
+		// const projectList = this.getActiveProjects();
+		// if (projectList) {
+		// 	this.contentEl.createEl("h3", { text: "Active Projects" });
+		// 	this.contentEl.appendChild(projectList);
+		// }
 
-		const projectList = this.getProjectList();
-		if (projectList) {
-			infoEl.createEl("h3", { text: "Active Projects" });
-			infoEl.appendChild(projectList);
+		if (area) {
+			const areaList = this.getProjectsByArea(area);
+			if (areaList) {
+				this.contentEl.createEl("h3", {
+					text: `Projects in Area: ${area}`,
+				});
+				this.contentEl.appendChild(areaList);
+			}
 		}
 	}
 
