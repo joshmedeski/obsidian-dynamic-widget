@@ -2,6 +2,22 @@ import { ItemView, WorkspaceLeaf, TFile } from "obsidian";
 
 export const VIEW_TYPE_DYNAMIC_WIDGET = "dynamic-widget-view";
 
+const ORDERED_FOLDER_NAMES = [
+	"Inbox 📥",
+	"Goals 🎯",
+	"Growth Edges 🌱",
+	"Projects 🏔️/Active ✅",
+	"Projects 🏔️/Upcoming ⏳",
+	"Projects 🏔️/Ideas 💡",
+	"Projects 🏔️/Backlog 🗄️",
+	"Projects 🏔️/Incubating 🌱",
+	"Relationships 👥",
+	"Resources 🛠️",
+	"Archives 📦",
+] as const;
+
+type FilesByFolder = { folder: string; files: TFile[] }[];
+
 export class DynamicWidgetView extends ItemView {
 	public contentEl: HTMLElement = document.createElement("div");
 
@@ -43,6 +59,18 @@ export class DynamicWidgetView extends ItemView {
 		return activeFile.basename;
 	}
 
+	private makeUlLinkListWithTitle(
+		title: string,
+		list: TFile[] | undefined,
+	): Element {
+		if (!list || list.length === 0) return document.createElement("div");
+		const sectionEl = document.createElement("section");
+		sectionEl.createEl("h4", { text: title });
+		const ulEl = this.makeUlLinkList(list);
+		sectionEl.appendChild(ulEl);
+		return sectionEl;
+	}
+
 	private makeUlLinkList(list: TFile[] | undefined): Element {
 		if (!list || list.length === 0) return document.createElement("div");
 		const ulEl = document.createElement("ul");
@@ -72,18 +100,30 @@ export class DynamicWidgetView extends ItemView {
 		return this.makeUlLinkList(activeProjectNotes);
 	}
 
-	private getProjectsByArea(area: string): Element {
-		const areaNotes = this.app.vault.getFiles().filter((file) => {
+	private filesByFolders(allFiles: TFile[]): FilesByFolder {
+		const notesByFolder: FilesByFolder = [];
+		ORDERED_FOLDER_NAMES.forEach((folder) => {
+			const files = allFiles.filter(
+				(file) =>
+					file.path.startsWith(folder) && file.extension === "md",
+			);
+			if (files) notesByFolder.push({ folder, files });
+		});
+		return notesByFolder;
+	}
+
+	private getFilesByArea(area: string): TFile[] {
+		return this.app.vault.getFiles().filter((file) => {
 			const metadata = this.app.metadataCache.getFileCache(file);
 			const areaFrontmatter = metadata?.frontmatter?.area;
 			if (!areaFrontmatter) return false;
-			console.log("Area Frontmatter:", areaFrontmatter);
 			if (Array.isArray(areaFrontmatter)) {
-				return areaFrontmatter.includes(area);
+				return areaFrontmatter
+					.map((area) => area.replace(/\[\[|\]\]/g, ""))
+					.includes(area);
 			}
 			return areaFrontmatter.replace(/\[\[|\]\]/g, "") === area;
 		});
-		return this.makeUlLinkList(areaNotes);
 	}
 
 	async onOpen(): Promise<void> {
@@ -154,12 +194,17 @@ export class DynamicWidgetView extends ItemView {
 		// }
 
 		if (area) {
-			const areaList = this.getProjectsByArea(area);
-			if (areaList) {
-				this.contentEl.createEl("h3", {
-					text: `Projects in Area: ${area}`,
+			const areaFiles = this.getFilesByArea(area);
+			if (areaFiles) {
+				const folders = this.filesByFolders(areaFiles);
+				// todo: loop through records
+				folders.forEach((folder) => {
+					const areaSection = this.makeUlLinkListWithTitle(
+						folder.folder,
+						folder.files,
+					);
+					if (areaSection) this.contentEl.appendChild(areaSection);
 				});
-				this.contentEl.appendChild(areaList);
 			}
 		}
 	}
