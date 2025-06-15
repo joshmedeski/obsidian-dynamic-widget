@@ -2,21 +2,6 @@ import { ItemView, WorkspaceLeaf, TFile, CachedMetadata } from "obsidian";
 
 export const VIEW_TYPE_DYNAMIC_WIDGET = "dynamic-widget-view";
 
-function dynamicHeaderText(activeFile: TFile | null): string {
-	if (!activeFile) return "Dynamic Widget";
-	const basename = activeFile.basename;
-	if (basename && basename.match(/^\d{4}-\d{2}-\d{2}$/)) {
-		const date = new Date(basename);
-		return date.toLocaleDateString("en-US", {
-			weekday: "short",
-			month: "short",
-			day: "numeric",
-			year: "numeric",
-		});
-	}
-	return activeFile.basename;
-}
-
 export class DynamicWidgetView extends ItemView {
 	public contentEl: HTMLElement = document.createElement("div");
 
@@ -34,6 +19,28 @@ export class DynamicWidgetView extends ItemView {
 
 	getIcon(): string {
 		return "activity";
+	}
+
+	dynamicHeaderText(activeFile: TFile | null): string {
+		if (!activeFile) return "Dynamic Widget";
+
+		// Check for "area" frontmatter property
+		const metadata = this.app.metadataCache.getFileCache(activeFile);
+		const area = metadata?.frontmatter?.area;
+		if (area) return area.replace(/\[\[|\]\]/g, "");
+
+		// Date formatting for date-named files
+		const basename = activeFile.basename;
+		if (basename && basename.match(/^\d{4}-\d{2}-\d{2}$/)) {
+			const date = new Date(basename);
+			return date.toLocaleDateString("en-US", {
+				weekday: "short",
+				month: "short",
+				day: "numeric",
+				year: "numeric",
+			});
+		}
+		return activeFile.basename;
 	}
 
 	async onOpen(): Promise<void> {
@@ -77,7 +84,7 @@ export class DynamicWidgetView extends ItemView {
 
 		// Header
 		this.contentEl.createEl("h2", {
-			text: dynamicHeaderText(activeFile),
+			text: this.dynamicHeaderText(activeFile),
 		});
 
 		if (!activeFile) {
