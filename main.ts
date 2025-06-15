@@ -13,7 +13,12 @@ export default class DynamicWidget extends Plugin {
 		);
 
 		// Auto-activate the widget in the right sidebar
-		await this.activateView();
+		this.app.workspace.onLayoutReady(async () => {
+			const leaf = this.app.workspace.getLeftLeaf(false);
+			if (leaf) {
+				await this.activateView();
+			}
+		});
 
 		// Add command to toggle the dynamic widget
 		this.addCommand({
