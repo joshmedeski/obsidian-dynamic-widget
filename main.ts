@@ -1,15 +1,4 @@
-import {
-	App,
-	Editor,
-	ItemView,
-	MarkdownView,
-	Modal,
-	Notice,
-	Plugin,
-	PluginSettingTab,
-	Setting,
-	WorkspaceLeaf,
-} from "obsidian";
+import { ItemView, Plugin, WorkspaceLeaf } from "obsidian";
 
 export const VIEW_TYPE_DYNAMIC_WIDGET = "dynamic-widget-view";
 
@@ -101,9 +90,6 @@ export default class DynamicWidget extends Plugin {
 				this.activateView();
 			},
 		});
-
-		// This adds a settings tab so the user can configure various aspects of the plugin
-		this.addSettingTab(new SampleSettingTab(this.app, this));
 	}
 
 	async activateView() {
@@ -143,49 +129,5 @@ export default class DynamicWidget extends Plugin {
 
 	async saveSettings() {
 		await this.saveData(this.settings);
-	}
-}
-
-class SampleModal extends Modal {
-	constructor(app: App) {
-		super(app);
-	}
-
-	onOpen() {
-		const { contentEl } = this;
-		contentEl.setText("Woah!");
-	}
-
-	onClose() {
-		const { contentEl } = this;
-		contentEl.empty();
-	}
-}
-
-class SampleSettingTab extends PluginSettingTab {
-	plugin: DynamicWidget;
-
-	constructor(app: App, plugin: DynamicWidget) {
-		super(app, plugin);
-		this.plugin = plugin;
-	}
-
-	display(): void {
-		const { containerEl } = this;
-
-		containerEl.empty();
-
-		new Setting(containerEl)
-			.setName("Setting #1")
-			.setDesc("It's a secret")
-			.addText((text) =>
-				text
-					.setPlaceholder("Enter your secret")
-					.setValue(this.plugin.settings.mySetting)
-					.onChange(async (value) => {
-						this.plugin.settings.mySetting = value;
-						await this.plugin.saveSettings();
-					}),
-			);
 	}
 }
