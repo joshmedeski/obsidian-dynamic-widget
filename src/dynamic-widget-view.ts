@@ -21,13 +21,12 @@ export class DynamicWidgetView extends ItemView {
 		return "activity";
 	}
 
-	dynamicHeaderText(activeFile: TFile | null): string {
+	private dynamicHeaderText(
+		area: string | undefined,
+		activeFile: TFile | null,
+	): string {
+		if (area) return area;
 		if (!activeFile) return "Dynamic Widget";
-
-		// Check for "area" frontmatter property
-		const metadata = this.app.metadataCache.getFileCache(activeFile);
-		const area = metadata?.frontmatter?.area;
-		if (area) return area.replace(/\[\[|\]\]/g, "");
 
 		// Date formatting for date-named files
 		const basename = activeFile.basename;
@@ -40,7 +39,37 @@ export class DynamicWidgetView extends ItemView {
 				year: "numeric",
 			});
 		}
+
 		return activeFile.basename;
+	}
+
+	private getProjectList(): Element {
+		const projectList = document.createElement("ul");
+		const activeProjectNotes = this.app.vault
+			.getFiles()
+			.filter((file) => {
+				return (
+					file.path.startsWith("Projects 🏔️/Active ✅") &&
+					file.extension === "md"
+				);
+			})
+			.map((project) => {
+				const projectEl = document.createElement("li");
+				const metadata = this.app.metadataCache.getFileCache(project);
+				projectEl.createEl("a", {
+					text: metadata?.frontmatter?.title || project.basename,
+					href: this.app.vault.getResourcePath(project),
+				});
+				return projectEl;
+			});
+		activeProjectNotes.forEach((el) => projectList.appendChild(el));
+		if (activeProjectNotes.length === 0) {
+			projectList.createEl("li", {
+				text: "No active projects found",
+				cls: "dynamic-widget-no-projects",
+			});
+		}
+		return projectList;
 	}
 
 	async onOpen(): Promise<void> {
@@ -82,9 +111,18 @@ export class DynamicWidgetView extends ItemView {
 
 		const activeFile = this.app.workspace.getActiveFile();
 
+		let area: string | undefined = undefined;
+		if (activeFile) {
+			const metadata = this.app.metadataCache.getFileCache(activeFile);
+			const areaFrontmatter = metadata?.frontmatter?.area;
+			if (areaFrontmatter) {
+				area = areaFrontmatter.replace(/\[\[|\]\]/g, "");
+			}
+		}
+
 		// Header
 		this.contentEl.createEl("h2", {
-			text: this.dynamicHeaderText(activeFile),
+			text: this.dynamicHeaderText(area, activeFile),
 		});
 
 		if (!activeFile) {
@@ -100,74 +138,10 @@ export class DynamicWidgetView extends ItemView {
 			cls: "dynamic-widget-info",
 		});
 
-		// Display file path
-		infoEl.createEl("p", {
-			text: `Path: ${activeFile.path}`,
-			cls: "dynamic-widget-path",
-		});
-
-		// Get and display file metadata
-		const metadata = this.app.metadataCache.getFileCache(activeFile);
-		if (metadata) {
-			this.displayMetadata(infoEl, metadata);
-		}
-	}
-
-	private displayMetadata(
-		container: HTMLElement,
-		metadata: CachedMetadata,
-	): void {
-		// Display frontmatter properties
-		if (metadata.frontmatter) {
-			const propertiesEl = container.createEl("div", {
-				cls: "dynamic-widget-properties",
-			});
-
-			propertiesEl.createEl("h3", { text: "Properties" });
-
-			const propsListEl = propertiesEl.createEl("ul");
-
-			for (const [key, value] of Object.entries(metadata.frontmatter)) {
-				const listItem = propsListEl.createEl("li");
-				listItem.createEl("strong", { text: `${key}: ` });
-				listItem.appendText(String(value));
-			}
-		}
-
-		// Display tags
-		if (metadata.tags && metadata.tags.length > 0) {
-			const tagsEl = container.createEl("div", {
-				cls: "dynamic-widget-tags",
-			});
-
-			tagsEl.createEl("h3", { text: "Tags" });
-
-			const tagsListEl = tagsEl.createEl("div", {
-				cls: "dynamic-widget-tags-list",
-			});
-
-			metadata.tags.forEach((tag) => {
-				tagsListEl.createEl("span", {
-					text: tag.tag,
-					cls: "dynamic-widget-tag",
-				});
-			});
-		}
-
-		// Display headings count
-		if (metadata.headings && metadata.headings.length > 0) {
-			container.createEl("p", {
-				text: `Headings: ${metadata.headings.length}`,
-				cls: "dynamic-widget-stat",
-			});
-		}
-
-		// Display links count
-		if (metadata.links && metadata.links.length > 0) {
-			container.createEl("p", {
-				text: `Links: ${metadata.links.length}`,
-				cls: "dynamic-widget-stat",
-			});
+		const projectList = this.getProjectList();
+		if (projectList) {
+			infoEl.createEl("h3", { text: "Active Projects" });
+			infoEl.appendChild(projectList);
 		}
 	}
 
