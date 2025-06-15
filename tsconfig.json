@@ -20,5 +20,8 @@
   },
   "include": [
     "**/*.ts"
-  ]
+  ],
+	"types": [
+		"obsidian-typings"
+	]
 }

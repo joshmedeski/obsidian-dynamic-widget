@@ -1,11 +1,11 @@
 {
-	"id": "sample-plugin",
-	"name": "Sample Plugin",
+	"id": "obsidian-dynamic-widget",
+	"name": "Dynamic Widget",
 	"version": "1.0.0",
 	"minAppVersion": "0.15.0",
-	"description": "Demonstrates some of the capabilities of the Obsidian API.",
+	"description": "A dynamic widget that can change based on the current note or other conditions.",
 	"author": "Obsidian",
-	"authorUrl": "https://obsidian.md",
-	"fundingUrl": "https://obsidian.md/pricing",
+	"authorUrl": "https://www.joshmedeski.com",
+	"fundingUrl": "https://www.joshmedeski.com",
 	"isDesktopOnly": false
 }

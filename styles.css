@@ -1,8 +1,55 @@
-/*
+.dynamic-widget-container {
+	padding: 10px;
+	height: 100%;
+}
 
-This CSS file will be included with your plugin, and
-available in the app when your plugin is enabled.
+.dynamic-widget-content {
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+}
 
-If your plugin does not need CSS, delete this file.
+.dynamic-widget-title {
+	margin: 0 0 8px 0;
+	padding-bottom: 8px;
+	border-bottom: 1px solid var(--background-modifier-border);
+	color: var(--text-normal);
+	font-size: 14px;
+	font-weight: 600;
+}
 
-*/
+.dynamic-widget-info {
+	color: var(--text-muted);
+	font-size: 13px;
+	line-height: 1.4;
+}
+
+.dynamic-widget-time {
+	padding: 8px;
+	background-color: var(--background-secondary);
+	border-radius: 4px;
+	font-size: 12px;
+	display: flex;
+	align-items: center;
+	gap: 4px;
+}
+
+.time-display {
+	font-family: var(--font-monospace);
+	color: var(--text-accent);
+}
+
+.dynamic-widget-button {
+	padding: 6px 12px;
+	background-color: var(--interactive-accent);
+	color: var(--text-on-accent);
+	border: none;
+	border-radius: 4px;
+	cursor: pointer;
+	font-size: 12px;
+	transition: background-color 0.2s;
+}
+
+.dynamic-widget-button:hover {
+	background-color: var(--interactive-accent-hover);
+}
