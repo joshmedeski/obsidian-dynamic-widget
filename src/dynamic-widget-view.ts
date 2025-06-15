@@ -47,7 +47,8 @@ export class DynamicWidgetView extends ItemView {
 		// Date formatting for date-named files
 		const basename = activeFile.basename;
 		if (basename && basename.match(/^\d{4}-\d{2}-\d{2}$/)) {
-			const date = new Date(basename);
+			const [year, month, day] = basename.split("-").map(Number);
+			const date = new Date(year, month - 1, day); // month is 0-indexed
 			return date.toLocaleDateString("en-US", {
 				weekday: "short",
 				month: "short",
@@ -99,16 +100,6 @@ export class DynamicWidgetView extends ItemView {
 		});
 		liEls.forEach((el) => ulEl.appendChild(el));
 		return ulEl;
-	}
-
-	private getActiveProjects(): Element {
-		const activeProjectNotes = this.app.vault.getFiles().filter((file) => {
-			return (
-				file.path.startsWith("Projects 🏔️/Active ✅") &&
-				file.extension === "md"
-			);
-		});
-		return this.makeUlLinkList(activeProjectNotes);
 	}
 
 	private filesByFolders(allFiles: TFile[]): FilesByFolder {
@@ -169,7 +160,7 @@ export class DynamicWidgetView extends ItemView {
 
 		// Listen for file movements/renames
 		this.registerEvent(
-			this.app.vault.on("rename", (file: TFile, oldPath: string) => {
+			this.app.vault.on("rename", (file: TFile) => {
 				// Update when any file with the same area is moved
 				const activeFile = this.app.workspace.getActiveFile();
 				if (activeFile) {
@@ -196,7 +187,7 @@ export class DynamicWidgetView extends ItemView {
 
 		// Listen for file deletions
 		this.registerEvent(
-			this.app.vault.on("delete", (file: TFile) => {
+			this.app.vault.on("delete", () => {
 				// Update when any file with the same area is deleted
 				const activeFile = this.app.workspace.getActiveFile();
 				if (activeFile) {
