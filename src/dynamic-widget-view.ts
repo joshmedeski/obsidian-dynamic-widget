@@ -1,8 +1,10 @@
-import { ItemView, WorkspaceLeaf, TFile } from "obsidian";
+import { ItemView, WorkspaceLeaf, TFile, CachedMetadata } from "obsidian";
 
 export const VIEW_TYPE_DYNAMIC_WIDGET = "dynamic-widget-view";
 
 export class DynamicWidgetView extends ItemView {
+	public contentEl: HTMLElement = document.createElement("div");
+
 	constructor(leaf: WorkspaceLeaf) {
 		super(leaf);
 	}
@@ -12,6 +14,14 @@ export class DynamicWidgetView extends ItemView {
 	}
 
 	getDisplayText(): string {
+		return "Dynamic Widget";
+	}
+
+	getIcon(): string {
+		return "activity";
+	}
+
+	getHeader(): string {
 		const activeFile = this.app.workspace.getActiveFile();
 		if (activeFile) {
 			return activeFile.basename;
@@ -24,49 +34,130 @@ export class DynamicWidgetView extends ItemView {
 		container.empty();
 		container.addClass("dynamic-widget-container");
 
-		const content = container.createEl("div", {
+		// Create and store reference to content container
+		this.contentEl = container.createEl("div", {
 			cls: "dynamic-widget-content",
 		});
 
-		content.createEl("h4", {
-			text: "Dynamic Widget",
-			cls: "dynamic-widget-title",
-		});
+		// Initial content update
+		this.updateContent();
 
-		const infoEl = content.createEl("div", { cls: "dynamic-widget-info" });
-		infoEl.createEl("p", { text: "This is your dynamic widget!" });
-
-		const currentTime = content.createEl("div", {
-			cls: "dynamic-widget-time",
-		});
-		currentTime.createEl("strong", { text: "Current Time: " });
-		currentTime.createEl("span", {
-			text: new Date().toLocaleTimeString(),
-			cls: "time-display",
-		});
-
-		const actionButton = content.createEl("button", {
-			text: "Refresh",
-			cls: "dynamic-widget-button",
-		});
-
-		actionButton.addEventListener("click", () => {
-			const timeSpan = currentTime.querySelector(".time-display");
-			if (timeSpan) {
-				timeSpan.textContent = new Date().toLocaleTimeString();
-			}
-		});
-
-		// Listen for active leaf changes to update the title
+		// Listen for active file changes
 		this.registerEvent(
 			this.app.workspace.on("active-leaf-change", () => {
-				// The getDisplayText method will be called automatically when needed
-				// No explicit refresh needed as Obsidian handles this
-			})
+				this.updateContent();
+			}),
+		);
+
+		// Listen for file modifications
+		this.registerEvent(
+			this.app.metadataCache.on("changed", (file: TFile) => {
+				const activeFile = this.app.workspace.getActiveFile();
+				if (activeFile && activeFile.path === file.path) {
+					this.updateContent();
+				}
+			}),
 		);
 	}
 
+	private updateContent(): void {
+		if (!this.contentEl) return;
+
+		// Clear existing content
+		this.contentEl.empty();
+
+		const activeFile = this.app.workspace.getActiveFile();
+
+		// Header
+		this.contentEl.createEl("h1", {
+			text: this.getHeader(),
+		});
+
+		if (!activeFile) {
+			this.contentEl.createEl("p", {
+				text: "No file is currently active",
+				cls: "dynamic-widget-no-file",
+			});
+			return;
+		}
+
+		// File info section
+		const infoEl = this.contentEl.createEl("div", {
+			cls: "dynamic-widget-info",
+		});
+
+		// Display file path
+		infoEl.createEl("p", {
+			text: `Path: ${activeFile.path}`,
+			cls: "dynamic-widget-path",
+		});
+
+		// Get and display file metadata
+		const metadata = this.app.metadataCache.getFileCache(activeFile);
+		if (metadata) {
+			this.displayMetadata(infoEl, metadata);
+		}
+	}
+
+	private displayMetadata(
+		container: HTMLElement,
+		metadata: CachedMetadata,
+	): void {
+		// Display frontmatter properties
+		if (metadata.frontmatter) {
+			const propertiesEl = container.createEl("div", {
+				cls: "dynamic-widget-properties",
+			});
+
+			propertiesEl.createEl("h3", { text: "Properties" });
+
+			const propsListEl = propertiesEl.createEl("ul");
+
+			for (const [key, value] of Object.entries(metadata.frontmatter)) {
+				const listItem = propsListEl.createEl("li");
+				listItem.createEl("strong", { text: `${key}: ` });
+				listItem.appendText(String(value));
+			}
+		}
+
+		// Display tags
+		if (metadata.tags && metadata.tags.length > 0) {
+			const tagsEl = container.createEl("div", {
+				cls: "dynamic-widget-tags",
+			});
+
+			tagsEl.createEl("h3", { text: "Tags" });
+
+			const tagsListEl = tagsEl.createEl("div", {
+				cls: "dynamic-widget-tags-list",
+			});
+
+			metadata.tags.forEach((tag) => {
+				tagsListEl.createEl("span", {
+					text: tag.tag,
+					cls: "dynamic-widget-tag",
+				});
+			});
+		}
+
+		// Display headings count
+		if (metadata.headings && metadata.headings.length > 0) {
+			container.createEl("p", {
+				text: `Headings: ${metadata.headings.length}`,
+				cls: "dynamic-widget-stat",
+			});
+		}
+
+		// Display links count
+		if (metadata.links && metadata.links.length > 0) {
+			container.createEl("p", {
+				text: `Links: ${metadata.links.length}`,
+				cls: "dynamic-widget-stat",
+			});
+		}
+	}
+
 	async onClose(): Promise<void> {
-		// Cleanup when view is closed
+		this.contentEl = document.createElement("div");
 	}
 }
