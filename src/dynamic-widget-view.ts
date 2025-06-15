@@ -9,7 +9,7 @@ const ORDERED_FOLDER_NAMES = [
 	"Projects 🏔️/Active ✅",
 	"Projects 🏔️/Upcoming ⏳",
 	"Projects 🏔️/Ideas 💡",
-	"Projects 🏔️/Backlog 🗄️",
+	"Projects 🏔️/Backlog 🗃️",
 	"Projects 🏔️/Incubating 🌱",
 	"Relationships 👥",
 	"Resources 🛠️",
