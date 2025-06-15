@@ -2,6 +2,21 @@ import { ItemView, WorkspaceLeaf, TFile, CachedMetadata } from "obsidian";
 
 export const VIEW_TYPE_DYNAMIC_WIDGET = "dynamic-widget-view";
 
+function dynamicHeaderText(activeFile: TFile | null): string {
+	if (!activeFile) return "Dynamic Widget";
+	const basename = activeFile.basename;
+	if (basename && basename.match(/^\d{4}-\d{2}-\d{2}$/)) {
+		const date = new Date(basename);
+		return date.toLocaleDateString("en-US", {
+			weekday: "short",
+			month: "short",
+			day: "numeric",
+			year: "numeric",
+		});
+	}
+	return activeFile.basename;
+}
+
 export class DynamicWidgetView extends ItemView {
 	public contentEl: HTMLElement = document.createElement("div");
 
@@ -19,14 +34,6 @@ export class DynamicWidgetView extends ItemView {
 
 	getIcon(): string {
 		return "activity";
-	}
-
-	getHeader(): string {
-		const activeFile = this.app.workspace.getActiveFile();
-		if (activeFile) {
-			return activeFile.basename;
-		}
-		return "Dynamic Widget";
 	}
 
 	async onOpen(): Promise<void> {
@@ -69,8 +76,8 @@ export class DynamicWidgetView extends ItemView {
 		const activeFile = this.app.workspace.getActiveFile();
 
 		// Header
-		this.contentEl.createEl("h1", {
-			text: this.getHeader(),
+		this.contentEl.createEl("h2", {
+			text: dynamicHeaderText(activeFile),
 		});
 
 		if (!activeFile) {
