@@ -91,17 +91,22 @@ export class DynamicWidgetView extends ItemView {
 		return notesByFolder;
 	}
 
+	private simplifyWikiLink = (link: string) => link.replace(/\[\[|\]\]/g, "");
+
 	private getFilesByArea(area: string): TFile[] {
 		return this.app.vault.getFiles().filter((file) => {
 			const metadata = this.app.metadataCache.getFileCache(file);
-			const areaFrontmatter = metadata?.frontmatter?.area;
-			if (!areaFrontmatter) return false;
-			if (Array.isArray(areaFrontmatter)) {
-				return areaFrontmatter
-					.map((area) => area.replace(/\[\[|\]\]/g, ""))
-					.includes(area);
-			}
-			return areaFrontmatter.replace(/\[\[|\]\]/g, "") === area;
+
+			const fileArea = metadata?.frontmatter?.area;
+			if (fileArea) return area === this.simplifyWikiLink(fileArea);
+
+			const fileAreas: string[] | undefined =
+				metadata?.frontmatter?.areas;
+			if (!fileAreas?.length) return false;
+			const fileHasArea = fileAreas
+				.map(this.simplifyWikiLink)
+				.includes(area);
+			return fileHasArea;
 		});
 	}
 
