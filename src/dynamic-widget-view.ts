@@ -274,7 +274,10 @@ export class DynamicWidgetView extends ItemView {
 				const areaFiles = this.getFilesByArea(area);
 				areasFiles.push(...areaFiles);
 			}
-			const folders = this.filesByFolders(areasFiles);
+			const uniqueFiles = Array.from(
+				new Map(areasFiles.map((file) => [file.path, file])).values(),
+			);
+			const folders = this.filesByFolders(uniqueFiles);
 			folders.forEach((folder) => {
 				const areaSection = this.makeUlLinkListWithTitle(
 					folder.folder,
