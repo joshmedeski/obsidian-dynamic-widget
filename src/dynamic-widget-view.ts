@@ -234,9 +234,10 @@ export class DynamicWidgetView extends ItemView {
 
 	private determineActiveFileType(
 		activeFile: TFile | null,
-	): "area" | "day" | "other" {
+	): "area" | "areas" | "day" | "other" {
 		if (!activeFile) return "other";
 		const metadata = this.app.metadataCache.getFileCache(activeFile);
+		if (metadata?.frontmatter?.areas) return "areas";
 		if (metadata?.frontmatter?.area) return "area";
 		if (activeFile.basename.match(/^\d{4}-\d{2}-\d{2}$/)) return "day";
 		return "other";
@@ -251,6 +252,29 @@ export class DynamicWidgetView extends ItemView {
 		if (areaFiles) {
 			const folders = this.filesByFolders(areaFiles);
 			// todo: loop through records
+			folders.forEach((folder) => {
+				const areaSection = this.makeUlLinkListWithTitle(
+					folder.folder,
+					folder.files,
+				);
+				if (areaSection) this.contentEl.appendChild(areaSection);
+			});
+		}
+	}
+
+	private renderAreasContent(activeFile: TFile): void {
+		const metadata = this.app.metadataCache.getFileCache(activeFile);
+		// TODO: add zod validator
+		const areasFrontmatter = metadata?.frontmatter?.areas;
+		const areasFiles: TFile[] = [];
+		if (areasFrontmatter && areasFrontmatter.length > 0) {
+			const areas: string[] = areasFrontmatter.map(this.simplifyWikiLink);
+			for (const area of areas) {
+				this.contentEl.createEl("h2", { text: area });
+				const areaFiles = this.getFilesByArea(area);
+				areasFiles.push(...areaFiles);
+			}
+			const folders = this.filesByFolders(areasFiles);
 			folders.forEach((folder) => {
 				const areaSection = this.makeUlLinkListWithTitle(
 					folder.folder,
@@ -297,6 +321,9 @@ export class DynamicWidgetView extends ItemView {
 
 		const activeFileType = this.determineActiveFileType(activeFile);
 		switch (activeFileType) {
+			case "areas":
+				this.renderAreasContent(activeFile);
+				break;
 			case "area":
 				this.renderAreaContent(activeFile);
 				break;
