@@ -14,7 +14,9 @@ const ORDERED_FOLDER_NAMES = [
 	"Relationships 👥",
 	"Resources 🛠️",
 	"Archives 📦",
-] as const;
+];
+
+const DAILY_FOLDERS = ["Inbox 📥", "Projects 🏔️/Active ✅"];
 
 type FilesByFolder = { folder: string; files: TFile[] }[];
 
@@ -79,9 +81,12 @@ export class DynamicWidgetView extends ItemView {
 		return ulEl;
 	}
 
-	private filesByFolders(allFiles: TFile[]): FilesByFolder {
+	private filesByFolders(
+		allFiles: TFile[],
+		folders: string[],
+	): FilesByFolder {
 		const notesByFolder: FilesByFolder = [];
-		ORDERED_FOLDER_NAMES.forEach((folder) => {
+		folders.forEach((folder) => {
 			const files = allFiles.filter(
 				(file) =>
 					file.path.startsWith(folder) && file.extension === "md",
@@ -93,16 +98,18 @@ export class DynamicWidgetView extends ItemView {
 
 	private simplifyWikiLink = (link: string) => link.replace(/\[\[|\]\]/g, "");
 
+	private normalizeAreasFrontmatter(areas: string | string[]): string[] {
+		return typeof areas === "string" ? [areas] : areas;
+	}
+
 	private getFilesByArea(area: string): TFile[] {
 		return this.app.vault.getFiles().filter((file) => {
 			const metadata = this.app.metadataCache.getFileCache(file);
 
-			const fileArea = metadata?.frontmatter?.area;
-			if (fileArea) return area === this.simplifyWikiLink(fileArea);
-
 			const fileAreas: string[] | undefined =
-				metadata?.frontmatter?.areas;
+				this.normalizeAreasFrontmatter(metadata?.frontmatter?.areas);
 			if (!fileAreas?.length) return false;
+
 			const fileHasArea = fileAreas
 				.map(this.simplifyWikiLink)
 				.includes(area);
@@ -234,38 +241,20 @@ export class DynamicWidgetView extends ItemView {
 
 	private determineActiveFileType(
 		activeFile: TFile | null,
-	): "area" | "areas" | "day" | "other" {
+	): "areas" | "day" | "other" {
 		if (!activeFile) return "other";
 		const metadata = this.app.metadataCache.getFileCache(activeFile);
 		if (metadata?.frontmatter?.areas) return "areas";
-		if (metadata?.frontmatter?.area) return "area";
 		if (activeFile.basename.match(/^\d{4}-\d{2}-\d{2}$/)) return "day";
 		return "other";
-	}
-
-	private renderAreaContent(activeFile: TFile): void {
-		const metadata = this.app.metadataCache.getFileCache(activeFile);
-		const areaFrontmatter = metadata?.frontmatter?.area;
-		const area = areaFrontmatter.replace(/\[\[|\]\]/g, "");
-		this.contentEl.createEl("h2", { text: area });
-		const areaFiles = this.getFilesByArea(area);
-		if (areaFiles) {
-			const folders = this.filesByFolders(areaFiles);
-			// todo: loop through records
-			folders.forEach((folder) => {
-				const areaSection = this.makeUlLinkListWithTitle(
-					folder.folder,
-					folder.files,
-				);
-				if (areaSection) this.contentEl.appendChild(areaSection);
-			});
-		}
 	}
 
 	private renderAreasContent(activeFile: TFile): void {
 		const metadata = this.app.metadataCache.getFileCache(activeFile);
 		// TODO: add zod validator
-		const areasFrontmatter = metadata?.frontmatter?.areas;
+		const areasFrontmatter = this.normalizeAreasFrontmatter(
+			metadata?.frontmatter?.areas,
+		);
 		const areasFiles: TFile[] = [];
 		if (areasFrontmatter && areasFrontmatter.length > 0) {
 			const areas: string[] = areasFrontmatter.map(this.simplifyWikiLink);
@@ -277,7 +266,10 @@ export class DynamicWidgetView extends ItemView {
 			const uniqueFiles = Array.from(
 				new Map(areasFiles.map((file) => [file.path, file])).values(),
 			);
-			const folders = this.filesByFolders(uniqueFiles);
+			const folders = this.filesByFolders(
+				uniqueFiles,
+				ORDERED_FOLDER_NAMES,
+			);
 			folders.forEach((folder) => {
 				const areaSection = this.makeUlLinkListWithTitle(
 					folder.folder,
@@ -306,6 +298,17 @@ export class DynamicWidgetView extends ItemView {
 			}),
 		});
 
+		const allFiles = this.app.vault.getFiles();
+		const folders = this.filesByFolders(allFiles, DAILY_FOLDERS);
+		// todo: loop through records
+		folders.forEach((folder) => {
+			const areaSection = this.makeUlLinkListWithTitle(
+				folder.folder,
+				folder.files,
+			);
+			if (areaSection) this.contentEl.appendChild(areaSection);
+		});
+
 		this.getFilesByDayCreated(date);
 		this.getFilesByDayModified(date);
 	}
@@ -326,9 +329,6 @@ export class DynamicWidgetView extends ItemView {
 		switch (activeFileType) {
 			case "areas":
 				this.renderAreasContent(activeFile);
-				break;
-			case "area":
-				this.renderAreaContent(activeFile);
 				break;
 			case "day":
 				this.renderDateContent();
