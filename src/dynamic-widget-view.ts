@@ -56,8 +56,16 @@ export class DynamicWidgetView extends ItemView {
 		const ulEl = document.createElement("ul");
 		const activeFile = this.app.workspace.getActiveFile();
 
+		// Add emoji bullet class
+		ulEl.classList.add("emoji-bullet-list");
+
 		const liEls = list.map((project) => {
 			const projectEl = document.createElement("li");
+
+			// Extract emoji from the file's path
+			const emoji = this.getEmojiForFilePath(project.path);
+			projectEl.style.setProperty("--emoji-bullet", `"${emoji}"`);
+			projectEl.classList.add("emoji-bullet-item");
 
 			if (activeFile && activeFile.path === project.path) {
 				projectEl.createEl("span", {
@@ -97,6 +105,53 @@ export class DynamicWidgetView extends ItemView {
 	}
 
 	private simplifyWikiLink = (link: string) => link.replace(/\[\[|\]\]/g, "");
+
+	private extractEmojiFromFolderName(folderName: string): string {
+		// Extract emoji from folder names like "Inbox 📥" or "Projects 🏔️/Active ✅"
+		// This regex matches complete emoji sequences including variation selectors
+		const emojiRegex = /[\p{Emoji_Presentation}\p{Emoji}\uFE0F\u200D]+/gu;
+		const matches = folderName.match(emojiRegex);
+		if (matches && matches.length > 0) {
+			// Return the last emoji found
+			return matches[matches.length - 1];
+		}
+		// Fallback: return a default bullet
+		return "•";
+	}
+
+	private getEmojiForFilePath(filePath: string): string {
+		// First, try to find the matching folder from the predefined list
+		const matchingFolder = ORDERED_FOLDER_NAMES.find(folder => 
+			filePath.startsWith(folder)
+		);
+		
+		if (matchingFolder) {
+			return this.extractEmojiFromFolderName(matchingFolder);
+		}
+		
+		// If no predefined folder matches, extract emoji from the immediate parent folder
+		const pathParts = filePath.split('/');
+		if (pathParts.length > 1) {
+			// For files like "Periodic 🌄/Days 🌄/2025-07-15.md", use the immediate parent folder
+			const parentFolder = pathParts[pathParts.length - 2];
+			const emoji = this.extractEmojiFromFolderName(parentFolder);
+			if (emoji !== "•") {
+				return emoji;
+			}
+		}
+		
+		// If still no emoji found, try the root folder
+		if (pathParts.length > 0) {
+			const rootFolder = pathParts[0];
+			const emoji = this.extractEmojiFromFolderName(rootFolder);
+			if (emoji !== "•") {
+				return emoji;
+			}
+		}
+		
+		// Fallback: return a default bullet
+		return "•";
+	}
 
 	private normalizeAreasFrontmatter(areas: string | string[]): string[] {
 		return typeof areas === "string" ? [areas] : areas;

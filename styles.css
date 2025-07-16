@@ -1,0 +1,68 @@
+/* Dynamic Widget Styles */
+
+/* Emoji bullet list styling */
+.emoji-bullet-list {
+	list-style: none;
+	padding-left: 0;
+	margin: 0;
+}
+
+.emoji-bullet-item {
+	position: relative;
+	padding-left: 1.5em;
+	margin-bottom: 0.25em;
+}
+
+.emoji-bullet-item::before {
+	content: var(--emoji-bullet);
+	position: absolute;
+	left: 0;
+	top: 0;
+	width: 1.2em;
+	font-size: 0.9em;
+	line-height: 1.2;
+}
+
+/* Ensure proper spacing for active file items */
+.emoji-bullet-item .dynamic-widget-active-file {
+	display: inline-block;
+}
+
+/* Ensure proper spacing for link items */
+.emoji-bullet-item a {
+	display: inline-block;
+	text-decoration: none;
+	color: var(--text-normal);
+}
+
+.emoji-bullet-item a:hover {
+	color: var(--text-accent);
+	text-decoration: underline;
+}
+
+/* Container styling */
+.dynamic-widget-container {
+	padding: 1em;
+}
+
+.dynamic-widget-content {
+	/* Custom content styling can be added here */
+}
+
+/* Section styling */
+.dynamic-widget-content section {
+	margin-bottom: 1.5em;
+}
+
+.dynamic-widget-content section h4 {
+	margin-bottom: 0.5em;
+	color: var(--text-muted);
+	font-size: 0.9em;
+	font-weight: 600;
+}
+
+/* Active file styling */
+.dynamic-widget-active-file {
+	font-weight: 600;
+	color: var(--text-accent);
+}
