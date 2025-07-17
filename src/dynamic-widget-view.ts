@@ -121,16 +121,16 @@ export class DynamicWidgetView extends ItemView {
 
 	private getEmojiForFilePath(filePath: string): string {
 		// First, try to find the matching folder from the predefined list
-		const matchingFolder = ORDERED_FOLDER_NAMES.find(folder => 
-			filePath.startsWith(folder)
+		const matchingFolder = ORDERED_FOLDER_NAMES.find((folder) =>
+			filePath.startsWith(folder),
 		);
-		
+
 		if (matchingFolder) {
 			return this.extractEmojiFromFolderName(matchingFolder);
 		}
-		
+
 		// If no predefined folder matches, extract emoji from the immediate parent folder
-		const pathParts = filePath.split('/');
+		const pathParts = filePath.split("/");
 		if (pathParts.length > 1) {
 			// For files like "Periodic 🌄/Days 🌄/2025-07-15.md", use the immediate parent folder
 			const parentFolder = pathParts[pathParts.length - 2];
@@ -139,7 +139,7 @@ export class DynamicWidgetView extends ItemView {
 				return emoji;
 			}
 		}
-		
+
 		// If still no emoji found, try the root folder
 		if (pathParts.length > 0) {
 			const rootFolder = pathParts[0];
@@ -148,7 +148,7 @@ export class DynamicWidgetView extends ItemView {
 				return emoji;
 			}
 		}
-		
+
 		// Fallback: return a default bullet
 		return "•";
 	}
@@ -313,8 +313,15 @@ export class DynamicWidgetView extends ItemView {
 		const areasFiles: TFile[] = [];
 		if (areasFrontmatter && areasFrontmatter.length > 0) {
 			const areas: string[] = areasFrontmatter.map(this.simplifyWikiLink);
+			const areasHeaderEl = this.contentEl.createEl("div", {
+				cls: "areas-header",
+			});
+			areasHeaderEl.style.display = "flex";
+			areasHeaderEl.style.flexWrap = "wrap";
+			areasHeaderEl.style.gap = "10px";
+
 			for (const area of areas) {
-				this.contentEl.createEl("h2", { text: area });
+				areasHeaderEl.createEl("h2", { text: area });
 				const areaFiles = this.getFilesByArea(area);
 				areasFiles.push(...areaFiles);
 			}
