@@ -251,8 +251,15 @@ export class DynamicWidgetView extends ItemView {
 		// Listen for file movements/renames
 		this.registerEvent(
 			this.app.vault.on("rename", (file: TFile) => {
-				// Update when any file with the same area is moved
 				const activeFile = this.app.workspace.getActiveFile();
+
+				// If the currently active file was moved, always update
+				if (activeFile && activeFile.path === file.path) {
+					this.updateContent();
+					return;
+				}
+
+				// Update when any file with the same area is moved
 				if (activeFile) {
 					const metadata =
 						this.app.metadataCache.getFileCache(activeFile);
