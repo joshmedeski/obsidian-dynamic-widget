@@ -95,10 +95,12 @@ export class DynamicWidgetView extends ItemView {
 	): FilesByFolder {
 		const notesByFolder: FilesByFolder = [];
 		folders.forEach((folder) => {
-			const files = allFiles.filter(
-				(file) =>
-					file.path.startsWith(folder) && file.extension === "md",
-			);
+			const files = allFiles
+				.filter(
+					(file) =>
+						file.path.startsWith(folder) && file.extension === "md",
+				)
+				.sort((a, b) => b.stat.mtime - a.stat.mtime);
 			if (files) notesByFolder.push({ folder, files });
 		});
 		return notesByFolder;
