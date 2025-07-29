@@ -7,7 +7,8 @@ const ORDERED_FOLDER_NAMES = [
 	"Goals 🎯",
 	"Growth Edges 🌱",
 	"Projects 🏔️/Active ✅",
-	"Projects 🏔️/Upcoming ⏳",
+	"Projects 🏔️/Waiting For ⏳",
+	"Projects 🏔️/Upcoming 🔮",
 	"Projects 🏔️/Ideas 💡",
 	"Projects 🏔️/Incubating 🌱",
 	"Projects 🏔️/Backlog 🗃️",
@@ -16,7 +17,11 @@ const ORDERED_FOLDER_NAMES = [
 	"Archives 📦",
 ];
 
-const DAILY_FOLDERS = ["Inbox 📥", "Projects 🏔️/Active ✅"];
+const DAILY_FOLDERS = [
+	"Inbox 📥",
+	"Projects 🏔️/Active ✅",
+	"Projects 🏔️/Waiting For ⏳",
+];
 
 type FilesByFolder = { folder: string; files: TFile[] }[];
 
