@@ -23,6 +23,44 @@ export function isFilePrivate(app: App, file: TFile): boolean {
   return false;
 }
 
+/**
+ * Areas declare which calendars belong to them via a `calendars` frontmatter
+ * key, so the mapping lives in the vault rather than in plugin settings:
+ *
+ *   Areas/Family.md
+ *   ---
+ *   calendars:
+ *     - Josh/Diane
+ *   ---
+ *
+ * Returns the area names owning `calendarName`, matched case-insensitively so
+ * a rename that only changes capitalization in Calendar.app still resolves.
+ * More than one area may claim the same calendar.
+ */
+export function areasForCalendar(app: App, calendarName: string): string[] {
+  const wanted = calendarName.trim().toLowerCase();
+  if (!wanted) return [];
+
+  const matches: string[] = [];
+  for (const file of app.vault.getFiles()) {
+    if (!file.path.startsWith("Areas/") || file.extension !== "md") continue;
+
+    const calendars = app.metadataCache.getFileCache(file)?.frontmatter
+      ?.calendars;
+    if (calendars == null) continue;
+
+    const declared = (
+      Array.isArray(calendars) ? calendars : [calendars]
+    ).filter((entry): entry is string => typeof entry === "string");
+
+    const owns = declared.some(
+      (entry) => simplifyWikiLink(entry).toLowerCase() === wanted,
+    );
+    if (owns) matches.push(file.basename);
+  }
+  return matches;
+}
+
 export function simplifyWikiLink(link: string): string {
   // Strip the [[ ]] wrapper, then drop any alias (everything after the first |)
   // so aliased links like [[Child Note|My Alias]] resolve to their target path.

@@ -3,6 +3,7 @@ import { collectAreaNames, getAreaHierarchy } from "./areas-hierarchy";
 import { type CalendarEvent, fetchEventsForDate } from "./calendar";
 import type DynamicWidgetPlugin from "./main";
 import {
+  areasForCalendar,
   formatRelativeDeadline,
   isFilePrivate,
   isValidHex,
@@ -64,7 +65,10 @@ function formatDurationMmSs(ms: number): string {
   return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
 }
 
-function buildEventNoteContent(event: CalendarEvent): string {
+function buildEventNoteContent(
+  event: CalendarEvent,
+  areas: string[],
+): string {
   const isMeeting = Boolean(event.attendees && event.attendees.length > 0);
   const lines: string[] = ["---"];
   lines.push(`type: ${isMeeting ? "meeting" : "event"}`);
@@ -81,7 +85,14 @@ function buildEventNoteContent(event: CalendarEvent): string {
   lines.push("aliases:");
   lines.push(`  - "${event.title.replace(/"/g, '\\"')}"`);
 
-  lines.push("areas: []");
+  if (areas.length === 0) {
+    lines.push("areas: []");
+  } else {
+    lines.push("areas:");
+    for (const area of areas) {
+      lines.push(`  - "[[${area.replace(/"/g, '\\"')}]]"`);
+    }
+  }
 
   if (isMeeting && event.attendees) {
     lines.push("with:");
@@ -1330,7 +1341,10 @@ export class DynamicWidgetView extends ItemView {
     }
 
     const path = this.pickEventNotePath(event);
-    const content = buildEventNoteContent(event);
+    const content = buildEventNoteContent(
+      event,
+      areasForCalendar(this.app, event.calendar),
+    );
     try {
       const file = await this.app.vault.create(path, content);
       this.app.workspace.getLeaf("tab").openFile(file);

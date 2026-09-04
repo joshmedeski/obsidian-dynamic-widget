@@ -21,6 +21,26 @@ below, and the note's `icon` as a badge on the corner of the photo. Cards are
 ordered most-recently-modified first, and the number per row follows the width
 of the sidebar.
 
+## Calendars and areas
+
+Clicking an event in the widget's **Events** section creates a note for it. To have
+that note filed automatically, tell an Area which calendars belong to it with a
+`calendars` frontmatter key:
+
+```yaml
+# Areas/Family.md
+---
+type: area
+calendars:
+  - Josh/Diane
+  - Personal
+---
+```
+
+An event on the `Josh/Diane` calendar then gets `areas: - "[[Family]]"` on creation.
+Names are matched case-insensitively, more than one Area may claim the same calendar,
+and events on unmapped calendars are created with `areas: []` as before.
+
 ## Installation
 
 Not in the community plugin list. Install from a release:
