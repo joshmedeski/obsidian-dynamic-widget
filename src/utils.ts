@@ -1,4 +1,4 @@
-import type { App, TFile } from "obsidian";
+import { type App, TFile } from "obsidian";
 
 /** Bullet shown for a list item whose note has no `icon` frontmatter. */
 export const DEFAULT_BULLET = "\u23FA\uFE0F";
@@ -10,6 +10,17 @@ export function normalizeAreasFrontmatter(
   areas: string | string[],
 ): string[] {
   return typeof areas === "string" ? [areas] : areas;
+}
+
+/**
+ * The `icon` frontmatter of an area note, when that area exists and declares
+ * one. Lets an item with no icon of its own inherit its area's.
+ */
+export function areaIcon(app: App, areaName: string): string | undefined {
+  const file = app.vault.getAbstractFileByPath(`Areas/${areaName}.md`);
+  if (!(file instanceof TFile)) return undefined;
+  const icon = app.metadataCache.getFileCache(file)?.frontmatter?.icon;
+  return typeof icon === "string" && icon.length > 0 ? icon : undefined;
 }
 
 export function isFilePrivate(app: App, file: TFile): boolean {

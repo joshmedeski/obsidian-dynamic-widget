@@ -3,6 +3,7 @@ import { collectAreaNames, getAreaHierarchy } from "./areas-hierarchy";
 import { type CalendarEvent, fetchEventsForDate } from "./calendar";
 import type DynamicWidgetPlugin from "./main";
 import {
+  areaIcon,
   areasForCalendar,
   DEFAULT_BULLET,
   DEFAULT_EVENT_BULLET,
@@ -1369,8 +1370,22 @@ export class DynamicWidgetView extends ItemView {
         );
       }
 
-      const icon = meta?.frontmatter?.icon;
-      liEl.style.setProperty("--emoji-bullet", `"${icon || DEFAULT_EVENT_BULLET}"`);
+      // A captured event says more by naming the areas it was filed under than
+      // by repeating which calendar it came from. Plain names, no icons -- the
+      // bullet already carries an icon. Falls back to the calendar when the
+      // note has no areas, or when the event hasn't been captured yet.
+      const noteAreas = note
+        ? (
+            normalizeAreasFrontmatter(meta?.frontmatter?.areas ?? []) ?? []
+          ).map(simplifyWikiLink)
+        : [];
+
+      // Note's own icon, else the first area's, else the generic event bullet.
+      const icon =
+        meta?.frontmatter?.icon ||
+        (noteAreas.length > 0 ? areaIcon(this.app, noteAreas[0]) : undefined) ||
+        DEFAULT_EVENT_BULLET;
+      liEl.style.setProperty("--emoji-bullet", `"${icon}"`);
 
       const titleEl = liEl.createEl("div", {
         text: isPrivate ? redactText(label) : label,
@@ -1389,15 +1404,6 @@ export class DynamicWidgetView extends ItemView {
           : formatEventTimeRange(ev.startDate, ev.endDate),
         cls: "calendar-event-time",
       });
-      // A captured event says more by naming the areas it was filed under than
-      // by repeating which calendar it came from. Plain names, no icons -- the
-      // bullet already carries the note's icon. Falls back to the calendar when
-      // the note has no areas, or when the event hasn't been captured yet.
-      const noteAreas = note
-        ? (
-            normalizeAreasFrontmatter(meta?.frontmatter?.areas ?? []) ?? []
-          ).map(simplifyWikiLink)
-        : [];
       const source = noteAreas.length > 0 ? noteAreas.join(", ") : ev.calendar;
       if (source) {
         const sourceEl = metaEl.createEl("span", {
