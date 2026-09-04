@@ -1,9 +1,26 @@
-import type { App, TFile } from "obsidian";
+import { type App, TFile } from "obsidian";
+
+/** Bullet shown for a list item whose note has no `icon` frontmatter. */
+export const DEFAULT_BULLET = "\u23FA\uFE0F";
+
+/** Bullet for a calendar event that has not been captured as a note yet. */
+export const DEFAULT_EVENT_BULLET = "\u{1F535}";
 
 export function normalizeAreasFrontmatter(
   areas: string | string[],
 ): string[] {
   return typeof areas === "string" ? [areas] : areas;
+}
+
+/**
+ * The `icon` frontmatter of an area note, when that area exists and declares
+ * one. Lets an item with no icon of its own inherit its area's.
+ */
+export function areaIcon(app: App, areaName: string): string | undefined {
+  const file = app.vault.getAbstractFileByPath(`Areas/${areaName}.md`);
+  if (!(file instanceof TFile)) return undefined;
+  const icon = app.metadataCache.getFileCache(file)?.frontmatter?.icon;
+  return typeof icon === "string" && icon.length > 0 ? icon : undefined;
 }
 
 export function isFilePrivate(app: App, file: TFile): boolean {
@@ -21,6 +38,44 @@ export function isFilePrivate(app: App, file: TFile): boolean {
     if (areaMeta?.frontmatter?.private === true) return true;
   }
   return false;
+}
+
+/**
+ * Areas declare which calendars belong to them via a `calendars` frontmatter
+ * key, so the mapping lives in the vault rather than in plugin settings:
+ *
+ *   Areas/Family.md
+ *   ---
+ *   calendars:
+ *     - Josh/Diane
+ *   ---
+ *
+ * Returns the area names owning `calendarName`, matched case-insensitively so
+ * a rename that only changes capitalization in Calendar.app still resolves.
+ * More than one area may claim the same calendar.
+ */
+export function areasForCalendar(app: App, calendarName: string): string[] {
+  const wanted = calendarName.trim().toLowerCase();
+  if (!wanted) return [];
+
+  const matches: string[] = [];
+  for (const file of app.vault.getFiles()) {
+    if (!file.path.startsWith("Areas/") || file.extension !== "md") continue;
+
+    const calendars = app.metadataCache.getFileCache(file)?.frontmatter
+      ?.calendars;
+    if (calendars == null) continue;
+
+    const declared = (
+      Array.isArray(calendars) ? calendars : [calendars]
+    ).filter((entry): entry is string => typeof entry === "string");
+
+    const owns = declared.some(
+      (entry) => simplifyWikiLink(entry).toLowerCase() === wanted,
+    );
+    if (owns) matches.push(file.basename);
+  }
+  return matches;
 }
 
 export function simplifyWikiLink(link: string): string {

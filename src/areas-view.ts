@@ -128,7 +128,6 @@ export class AreasView extends ItemView {
       if (isPrivate) {
         h1.classList.add("dynamic-widget-private");
       } else {
-        h1.style.cursor = "pointer";
         h1.addEventListener("click", () => {
           this.app.workspace.getLeaf("tab").openFile(file);
         });
@@ -167,7 +166,7 @@ export class AreasView extends ItemView {
 
           const childLink = li.createEl("a", {
             text: childName,
-            cls: "areas-view-child-link",
+            cls: "dw-list-title areas-view-child-link",
           });
           if (childPrivate) {
             childLink.classList.add("dynamic-widget-private");
@@ -195,7 +194,7 @@ export class AreasView extends ItemView {
 
               const gcLink = li.createEl("a", {
                 text: gcName,
-                cls: "areas-view-grandchild",
+                cls: "dw-list-title areas-view-grandchild",
               });
               if (gcPrivate) {
                 gcLink.classList.add("dynamic-widget-private");

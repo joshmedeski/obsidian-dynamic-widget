@@ -177,10 +177,16 @@ export default class DynamicWidgetPlugin extends Plugin {
   }
 
   async activateView() {
-    // Remove any existing instances
-    this.app.workspace.detachLeavesOfType(VIEW_TYPE_DYNAMIC_WIDGET);
+    // Reuse an existing widget leaf rather than detaching and rebuilding it,
+    // so running the command twice doesn't move the pane or lose its state.
+    const existing = this.app.workspace.getLeavesOfType(
+      VIEW_TYPE_DYNAMIC_WIDGET,
+    );
+    if (existing.length > 0) {
+      this.app.workspace.revealLeaf(existing[0]);
+      return;
+    }
 
-    // Create and activate the view in right sidebar
     const leaf = this.app.workspace.getLeftLeaf(false);
     if (!leaf) {
       return;
@@ -190,12 +196,7 @@ export default class DynamicWidgetPlugin extends Plugin {
       type: VIEW_TYPE_DYNAMIC_WIDGET,
       active: true,
     });
-
-    // Ensure the view is visible
-    const leaves = this.app.workspace.getLeavesOfType(VIEW_TYPE_DYNAMIC_WIDGET);
-    if (leaves.length > 0) {
-      this.app.workspace.revealLeaf(leaves[0]);
-    }
+    this.app.workspace.revealLeaf(leaf);
   }
 
   async activateAreasView() {
@@ -218,10 +219,9 @@ export default class DynamicWidgetPlugin extends Plugin {
 
   onunload() {
     this.editorFooter.detach();
-    // Clean up views when plugin is disabled
-    this.app.workspace.detachLeavesOfType(VIEW_TYPE_DYNAMIC_WIDGET);
-    this.app.workspace.detachLeavesOfType(VIEW_TYPE_PRIVATE_NOTE);
-    this.app.workspace.detachLeavesOfType(VIEW_TYPE_AREAS);
-    this.app.workspace.detachLeavesOfType(VIEW_TYPE_SOMEDAY_MAYBE);
+    // Deliberately does NOT detach leaves. Obsidian keeps them across a plugin
+    // reload and rebuilds the views once onload re-registers the view types --
+    // that is what lets Hot-Reload swap in a new build without the sidebar
+    // disappearing. Detaching here would close the user's panes on every save.
   }
 }

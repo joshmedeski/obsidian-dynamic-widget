@@ -2,6 +2,7 @@ import { ItemView, type TFile, type WorkspaceLeaf } from "obsidian";
 import { type AreaNode, getAreaHierarchy } from "./areas-hierarchy";
 import type DynamicWidgetPlugin from "./main";
 import {
+  DEFAULT_BULLET,
   formatRelativeDeadline,
   isFilePrivate,
   isValidHex,
@@ -210,24 +211,25 @@ export class SomedayMaybeView extends ItemView {
 
   private makeProjectList(list: TFile[]): HTMLElement {
     const ulEl = document.createElement("ul");
-    ulEl.classList.add("emoji-bullet-list");
+    ulEl.classList.add("dw-list");
 
     const sorted = [...list].sort((a, b) => b.stat.mtime - a.stat.mtime);
 
     for (const note of sorted) {
       const li = document.createElement("li");
-      li.classList.add("emoji-bullet-item");
+      li.classList.add("dw-list-item");
 
       const isPrivate =
         this.plugin.privateMode && isFilePrivate(this.app, note);
 
       const metadata = this.app.metadataCache.getFileCache(note);
       const icon = metadata?.frontmatter?.icon;
-      li.style.setProperty("--emoji-bullet", icon ? `"${icon}"` : "'⏺️'");
+      li.style.setProperty("--emoji-bullet", `"${icon || DEFAULT_BULLET}"`);
 
       const title = metadata?.frontmatter?.title || note.basename;
       const linkEl = li.createEl("a", {
         text: isPrivate ? redactText(title) : title,
+        cls: "dw-list-title",
       });
 
       if (isPrivate) {
@@ -245,7 +247,7 @@ export class SomedayMaybeView extends ItemView {
         if (deadlineLabel) {
           li.createEl("div", {
             text: deadlineLabel,
-            cls: "dynamic-widget-project-deadline",
+            cls: "dw-list-meta",
           });
         }
       }
@@ -328,7 +330,7 @@ export class SomedayMaybeView extends ItemView {
 
       card.style.setProperty("--card-cols", String(cols));
 
-      const list = card.querySelector<HTMLElement>(".emoji-bullet-list");
+      const list = card.querySelector<HTMLElement>(".dw-list");
       if (!list) continue;
 
       if (cols > 1) {

@@ -3,6 +3,10 @@ import { collectAreaNames, getAreaHierarchy } from "./areas-hierarchy";
 import { type CalendarEvent, fetchEventsForDate } from "./calendar";
 import type DynamicWidgetPlugin from "./main";
 import {
+  areaIcon,
+  areasForCalendar,
+  DEFAULT_BULLET,
+  DEFAULT_EVENT_BULLET,
   formatRelativeDeadline,
   isFilePrivate,
   isValidHex,
@@ -14,11 +18,38 @@ import {
 export const VIEW_TYPE_DYNAMIC_WIDGET = "dynamic-widget-view";
 const dayFileNameRegex = /^\d{4}-\d{2}-\d{2}$/;
 
-function formatEventTime(date: Date): string {
-  return date.toLocaleTimeString("en-US", {
-    hour: "numeric",
-    minute: "2-digit",
-  });
+function formatEventClock(date: Date): { time: string; meridiem: string } {
+  const hours = date.getHours();
+  const minutes = date.getMinutes();
+  const hour12 = hours % 12 === 0 ? 12 : hours % 12;
+  return {
+    // On-the-hour times drop ":00" -- "11" rather than "11:00".
+    time:
+      minutes === 0
+        ? String(hour12)
+        : `${hour12}:${String(minutes).padStart(2, "0")}`,
+    meridiem: hours < 12 ? "am" : "pm",
+  };
+}
+
+/**
+ * Compact range for a sidebar that has little room: "11-11:30am", "7-9pm",
+ * "11:30am-1pm". The meridiem is written once when both ends share it, which
+ * is the common case for a single meeting, and on both ends when they differ
+ * or when the event runs past midnight into another day.
+ */
+function formatEventTimeRange(start: Date, end: Date): string {
+  const from = formatEventClock(start);
+  const to = formatEventClock(end);
+
+  if (start.getTime() === end.getTime()) {
+    return `${from.time}${from.meridiem}`;
+  }
+
+  const sameDay = start.toDateString() === end.toDateString();
+  const shareMeridiem = sameDay && from.meridiem === to.meridiem;
+  const fromLabel = shareMeridiem ? from.time : `${from.time}${from.meridiem}`;
+  return `${fromLabel}-${to.time}${to.meridiem}`;
 }
 
 function sanitizeFilenameSegment(raw: string): string {
@@ -36,6 +67,17 @@ function formatEventDateLabel(date: Date): string {
       year: "numeric",
     })
     .replace(/,/g, "");
+}
+
+/**
+ * Note filenames carry the event date for uniqueness ("Call with Bowden (Sep 1
+ * 2026)"), which is redundant in a list already scoped to one day. Only strips
+ * the suffix this plugin would have generated for *this* event's date, so a
+ * title that genuinely ends in parentheses survives.
+ */
+function stripEventDateSuffix(label: string, event: CalendarEvent): string {
+  const suffix = ` (${formatEventDateLabel(event.startDate)})`;
+  return label.endsWith(suffix) ? label.slice(0, -suffix.length) : label;
 }
 
 function buildEventNoteFilename(event: CalendarEvent): string {
@@ -64,7 +106,10 @@ function formatDurationMmSs(ms: number): string {
   return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
 }
 
-function buildEventNoteContent(event: CalendarEvent): string {
+function buildEventNoteContent(
+  event: CalendarEvent,
+  areas: string[],
+): string {
   const isMeeting = Boolean(event.attendees && event.attendees.length > 0);
   const lines: string[] = ["---"];
   lines.push(`type: ${isMeeting ? "meeting" : "event"}`);
@@ -81,7 +126,14 @@ function buildEventNoteContent(event: CalendarEvent): string {
   lines.push("aliases:");
   lines.push(`  - "${event.title.replace(/"/g, '\\"')}"`);
 
-  lines.push("areas: []");
+  if (areas.length === 0) {
+    lines.push("areas: []");
+  } else {
+    lines.push("areas:");
+    for (const area of areas) {
+      lines.push(`  - "[[${area.replace(/"/g, '\\"')}]]"`);
+    }
+  }
 
   if (isMeeting && event.attendees) {
     lines.push("with:");
@@ -675,7 +727,7 @@ export class DynamicWidgetView extends ItemView {
     const activeFile = this.app.workspace.getActiveFile();
 
     // Add emoji bullet class
-    ulEl.classList.add("emoji-bullet-list");
+    ulEl.classList.add("dw-list");
 
     const liEls = list
       .sort((a, b) => {
@@ -712,19 +764,23 @@ export class DynamicWidgetView extends ItemView {
 
         const metadata = this.app.metadataCache.getFileCache(note);
 
-        projectEl.classList.add("emoji-bullet-item");
+        projectEl.classList.add("dw-list-item");
 
         // Extract emoji from the file's path
         const icon = metadata?.frontmatter?.icon;
         if (icon) {
           projectEl.style.setProperty("--emoji-bullet", `"${icon}"`);
         } else {
-          projectEl.style.setProperty("--emoji-bullet", "'⏺️'");
+          projectEl.style.setProperty(
+            "--emoji-bullet",
+            `"${DEFAULT_BULLET}"`,
+          );
         }
 
         const title = metadata?.frontmatter?.title || note.basename;
         const linkEl = projectEl.createEl("a", {
           text: isPrivate ? redactText(title) : title,
+          cls: "dw-list-title",
         });
 
         if (isPrivate) {
@@ -743,7 +799,7 @@ export class DynamicWidgetView extends ItemView {
           if (label) {
             projectEl.createEl("div", {
               text: label,
-              cls: "dynamic-widget-project-deadline",
+              cls: "dw-list-meta",
             });
           }
         }
@@ -1287,24 +1343,76 @@ export class DynamicWidgetView extends ItemView {
       return;
     }
 
-    const ulEl = bodyEl.createEl("ul", { cls: "calendar-events-list" });
+    const notes = this.eventNotesByCalendarId();
+    const ulEl = bodyEl.createEl("ul", {
+      cls: "dw-list",
+    });
     for (const ev of events) {
-      const liEl = ulEl.createEl("li", { cls: "calendar-event-item" });
+      const liEl = ulEl.createEl("li", {
+        cls: "dw-list-item is-row",
+      });
       liEl.setAttribute("role", "button");
       liEl.setAttribute("tabindex", "0");
-      liEl.createEl("span", {
-        text: ev.allDay ? "All day" : formatEventTime(ev.startDate),
+
+      // Once an event has been captured, the note is the thing worth showing --
+      // it carries any rename or icon the event title doesn't know about.
+      const note = notes.get(ev.id);
+      const meta = note ? this.app.metadataCache.getFileCache(note) : null;
+      const isPrivate = Boolean(
+        note && this.plugin.privateMode && isFilePrivate(this.app, note),
+      );
+
+      let label = ev.title;
+      if (note) {
+        label = stripEventDateSuffix(
+          meta?.frontmatter?.title || note.basename,
+          ev,
+        );
+      }
+
+      // A captured event says more by naming the areas it was filed under than
+      // by repeating which calendar it came from. Plain names, no icons -- the
+      // bullet already carries an icon. Falls back to the calendar when the
+      // note has no areas, or when the event hasn't been captured yet.
+      const noteAreas = note
+        ? (
+            normalizeAreasFrontmatter(meta?.frontmatter?.areas ?? []) ?? []
+          ).map(simplifyWikiLink)
+        : [];
+
+      // Note's own icon, else the first area's, else the generic event bullet.
+      const icon =
+        meta?.frontmatter?.icon ||
+        (noteAreas.length > 0 ? areaIcon(this.app, noteAreas[0]) : undefined) ||
+        DEFAULT_EVENT_BULLET;
+      liEl.style.setProperty("--emoji-bullet", `"${icon}"`);
+
+      const titleEl = liEl.createEl("div", {
+        text: isPrivate ? redactText(label) : label,
+        cls: "dw-list-title",
+      });
+      if (isPrivate) {
+        titleEl.classList.add("dynamic-widget-private");
+      }
+
+      const metaEl = liEl.createEl("div", {
+        cls: "dw-list-meta calendar-event-meta",
+      });
+      metaEl.createEl("span", {
+        text: ev.allDay
+          ? "All day"
+          : formatEventTimeRange(ev.startDate, ev.endDate),
         cls: "calendar-event-time",
       });
-      liEl.createEl("span", {
-        text: ev.title,
-        cls: "calendar-event-title",
-      });
-      if (ev.calendar) {
-        liEl.createEl("span", {
-          text: ev.calendar,
-          cls: "calendar-event-calendar",
+      const source = noteAreas.length > 0 ? noteAreas.join(", ") : ev.calendar;
+      if (source) {
+        const sourceEl = metaEl.createEl("span", {
+          text: isPrivate ? redactText(source) : source,
+          cls: "calendar-event-source",
         });
+        if (isPrivate) {
+          sourceEl.classList.add("dynamic-widget-private");
+        }
       }
       liEl.addEventListener("click", () => {
         this.openOrCreateEventNote(ev);
@@ -1318,11 +1426,24 @@ export class DynamicWidgetView extends ItemView {
     }
   }
 
+  /**
+   * Notes created from calendar events keep the event's id in `calendar_id`.
+   * Built once per render so the events list doesn't rescan the vault per row.
+   */
+  private eventNotesByCalendarId(): Map<string, TFile> {
+    const notes = new Map<string, TFile>();
+    for (const file of this.app.vault.getMarkdownFiles()) {
+      const id = this.app.metadataCache.getFileCache(file)?.frontmatter
+        ?.calendar_id;
+      if (typeof id === "string" && !notes.has(id)) {
+        notes.set(id, file);
+      }
+    }
+    return notes;
+  }
+
   private async openOrCreateEventNote(event: CalendarEvent): Promise<void> {
-    const existing = this.app.vault.getFiles().find((f) => {
-      const meta = this.app.metadataCache.getFileCache(f);
-      return meta?.frontmatter?.calendar_id === event.id;
-    });
+    const existing = this.eventNotesByCalendarId().get(event.id);
 
     if (existing) {
       this.app.workspace.getLeaf("tab").openFile(existing);
@@ -1330,7 +1451,10 @@ export class DynamicWidgetView extends ItemView {
     }
 
     const path = this.pickEventNotePath(event);
-    const content = buildEventNoteContent(event);
+    const content = buildEventNoteContent(
+      event,
+      areasForCalendar(this.app, event.calendar),
+    );
     try {
       const file = await this.app.vault.create(path, content);
       this.app.workspace.getLeaf("tab").openFile(file);

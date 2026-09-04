@@ -1,51 +1,89 @@
 /* Dynamic Widget Styles */
 
-/* Emoji bullet list styling */
-.emoji-bullet-list {
+/* ---------------------------------------------------------------------------
+   Shared list primitives
+
+   Every list surface composes these: widget sections, someday-maybe cards,
+   the areas view, and calendar events. Variants below add only what is
+   genuinely their own -- they never restate the reset, gutter, or hover.
+
+   The gutter is driven by variables so a row that insets itself for a hover
+   background stays aligned without hand-computing offsets:
+
+     padding-left = --dw-bullet-gutter + --dw-row-inset-x
+     bullet left  = --dw-row-inset-x
+--------------------------------------------------------------------------- */
+.dw-list {
+  --dw-bullet-gutter: 1.5em;
+  --dw-row-inset-x: 0em;
+  --dw-row-inset-y: 0em;
   list-style: none;
   padding-left: 0;
   margin: 0;
-  /* font-size: var(--font-text-size); */
 }
 
-.emoji-bullet-item {
+.dw-list-item {
   position: relative;
-  padding-left: 1.5em;
+  padding: var(--dw-row-inset-y) var(--dw-row-inset-x);
+  padding-left: calc(var(--dw-bullet-gutter) + var(--dw-row-inset-x));
+  margin-left: calc(var(--dw-row-inset-x) * -1);
+  margin-right: calc(var(--dw-row-inset-x) * -1);
   margin-bottom: 0.25em;
 }
 
-.emoji-bullet-item::before {
-  content: var(--emoji-bullet);
+.dw-list-item::before {
+  content: var(--emoji-bullet, "");
   position: absolute;
-  left: 0;
-  top: 0;
-  /* width: var(--font-text-size); */
-  /* font-size: var(--font-text-size); */
+  left: var(--dw-row-inset-x);
+  top: var(--dw-row-inset-y);
   line-height: 1.2;
 }
 
-/* Ensure proper spacing for active file items */
-.emoji-bullet-item .dynamic-widget-active-file {
+/* The clickable text of a list item. Nothing here has an href -- these are
+   bare anchors with JS click handlers -- so the pointer cursor has to be
+   stated explicitly or the browser gives them a text caret. */
+.dw-list-title {
   display: inline-block;
-}
-
-/* Ensure proper spacing for link items */
-.emoji-bullet-item a {
-  display: inline-block;
-  text-decoration: none;
   color: var(--text-normal);
+  text-decoration: none;
+  cursor: pointer;
 }
 
-.emoji-bullet-item a:hover {
+.dw-list-title:hover,
+.dw-list-item:hover .dw-list-title,
+.dw-list-item:focus-visible .dw-list-title,
+.dynamic-widget-grid-item:hover .dynamic-widget-grid-name {
   color: var(--text-accent);
   text-decoration: underline;
 }
 
-.dynamic-widget-project-deadline {
+/* Secondary line under a title: deadlines, event times, and so on. */
+.dw-list-meta {
   font-size: var(--font-smaller);
-  color: var(--text-muted);
   line-height: 1.2;
+  color: var(--text-muted);
   margin-top: 0.1em;
+}
+
+/* Items where the whole row is the click target, not just the title. Opting
+   in shifts the gutter automatically via the inset variables. */
+.dw-list-item.is-row {
+  --dw-row-inset-x: 0.35em;
+  --dw-row-inset-y: 0.15em;
+  cursor: pointer;
+  line-height: 1.3;
+  border-radius: var(--radius-s);
+  margin-bottom: 0.35em;
+}
+
+.dw-list-item.is-row:hover,
+.dw-list-item.is-row:focus-visible {
+  background: var(--background-modifier-hover);
+  outline: none;
+}
+
+.dw-list-item .dynamic-widget-active-file {
+  display: inline-block;
 }
 
 /* Container styling */
@@ -165,55 +203,24 @@
   filter: brightness(1.15);
 }
 
-/* Calendar events section */
-.calendar-events-list {
-  list-style: none;
-  padding-left: 0;
-  margin: 0;
-}
-
-.calendar-event-item {
+/* Calendar events section.
+   Layout, gutter, cursor and hover all come from .dw-list-item.is-row; the
+   only thing calendar-specific is laying the meta line out as a row. */
+.calendar-event-meta {
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
   gap: 0.5em;
-  margin-bottom: 0.35em;
-  line-height: 1.3;
-  cursor: pointer;
-  border-radius: var(--radius-s);
-  padding: 0.15em 0.35em;
-  margin-left: -0.35em;
-  margin-right: -0.35em;
-}
-
-.calendar-event-item:hover,
-.calendar-event-item:focus-visible {
-  background: var(--background-modifier-hover);
-  outline: none;
-}
-
-.calendar-event-item:hover .calendar-event-title,
-.calendar-event-item:focus-visible .calendar-event-title {
-  color: var(--text-accent);
 }
 
 .calendar-event-time {
-  flex: 0 0 auto;
-  min-width: 4.5em;
   font-variant-numeric: tabular-nums;
-  font-size: var(--font-smaller);
-  color: var(--text-muted);
 }
 
-.calendar-event-title {
-  flex: 1 1 auto;
-  color: var(--text-normal);
-  min-width: 0;
-}
-
-.calendar-event-calendar {
-  flex: 0 0 auto;
-  font-size: var(--font-smallest);
+/* The areas the event's note is filed under, or the calendar name when it has
+   no note yet. Same size as the time (both inherit --font-smaller from
+   .dw-list-meta); only the color separates them. */
+.calendar-event-source {
   color: var(--text-faint);
 }
 
@@ -370,6 +377,10 @@
   margin-bottom: 0.25em;
 }
 
+.areas-view-heading {
+  cursor: pointer;
+}
+
 .areas-view-heading:hover {
   color: var(--text-accent);
 }
@@ -380,15 +391,9 @@
   font-size: var(--font-text-size);
 }
 
+/* Base and hover come from .dw-list-title; only the weight differs here. */
 .areas-view-child-link {
   font-weight: var(--bold-weight);
-  text-decoration: none;
-  color: var(--text-normal);
-  cursor: pointer;
-}
-
-.areas-view-child-link:hover {
-  color: var(--text-accent);
 }
 
 .areas-view-arrow {
@@ -397,13 +402,6 @@
 
 .areas-view-grandchild {
   font-weight: normal;
-  color: var(--text-normal);
-  text-decoration: none;
-  cursor: pointer;
-}
-
-.areas-view-grandchild:hover {
-  color: var(--text-accent);
 }
 
 .areas-view-empty {
@@ -509,12 +507,12 @@
 }
 
 /* Per-card list columns — JS sets column-count inline; CSS handles spacing */
-.someday-maybe-card .emoji-bullet-list {
+.someday-maybe-card .dw-list {
   column-gap: 1.5em;
   column-fill: balance;
 }
 
-.someday-maybe-card .emoji-bullet-list > li {
+.someday-maybe-card .dw-list > li {
   break-inside: avoid;
 }
 
@@ -598,10 +596,8 @@
   overflow-wrap: anywhere;
   display: -webkit-box;
   -webkit-line-clamp: 2;
+  line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
 
-.dynamic-widget-grid-item:hover .dynamic-widget-grid-name {
-  color: var(--text-accent);
-}
