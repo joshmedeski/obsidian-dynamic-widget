@@ -92,6 +92,14 @@ function buildEventNoteFilename(event: CalendarEvent): string {
   return `${title} (${dateLabel})`;
 }
 
+/**
+ * Recurring events reuse one id across occurrences, so a captured note is
+ * identified by the id *and* the day it happened on.
+ */
+function eventNoteKey(calendarId: string, date: Date): string {
+  return `${calendarId}#${toLocalIsoDate(date)}`;
+}
+
 function toLocalIsoDateTime(date: Date): string {
   const pad = (n: number) => String(n).padStart(2, "0");
   return (
@@ -1526,7 +1534,7 @@ export class DynamicWidgetView extends ItemView {
 
       // Once an event has been captured, the note is the thing worth showing --
       // it carries any rename or icon the event title doesn't know about.
-      const note = notes.get(ev.id);
+      const note = this.eventNoteFor(notes, ev);
       const meta = note ? this.app.metadataCache.getFileCache(note) : null;
       const isPrivate = Boolean(
         note && this.plugin.privateMode && isFilePrivate(this.app, note),
@@ -1599,21 +1607,44 @@ export class DynamicWidgetView extends ItemView {
   /**
    * Notes created from calendar events keep the event's id in `calendar_id`.
    * Built once per render so the events list doesn't rescan the vault per row.
+   *
+   * Every occurrence of a recurring event shares one id -- April's and May's
+   * USAF Meeting are the same `calendar_id` -- so the day is part of the key.
+   * Notes captured before that (id, no `when`) are still keyed by bare id.
    */
   private eventNotesByCalendarId(): Map<string, TFile> {
     const notes = new Map<string, TFile>();
     for (const file of this.app.vault.getMarkdownFiles()) {
-      const id = this.app.metadataCache.getFileCache(file)?.frontmatter
-        ?.calendar_id;
-      if (typeof id === "string" && !notes.has(id)) {
-        notes.set(id, file);
+      const frontmatter =
+        this.app.metadataCache.getFileCache(file)?.frontmatter;
+      const id = frontmatter?.calendar_id;
+      if (typeof id !== "string") continue;
+      const key =
+        frontmatter?.when == null
+          ? id
+          : eventNoteKey(id, eventNoteWhen(this.app, file).date);
+      if (!notes.has(key)) {
+        notes.set(key, file);
       }
     }
     return notes;
   }
 
+  /** The note captured for this exact occurrence, if there is one. */
+  private eventNoteFor(
+    notes: Map<string, TFile>,
+    event: CalendarEvent,
+  ): TFile | undefined {
+    return (
+      notes.get(eventNoteKey(event.id, event.startDate)) ?? notes.get(event.id)
+    );
+  }
+
   private async openOrCreateEventNote(event: CalendarEvent): Promise<void> {
-    const existing = this.eventNotesByCalendarId().get(event.id);
+    const existing = this.eventNoteFor(
+      this.eventNotesByCalendarId(),
+      event,
+    );
 
     if (existing) {
       this.app.workspace.getLeaf("tab").openFile(existing);
