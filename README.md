@@ -15,6 +15,12 @@ PARA-oriented views for navigating a second brain.
 The widget follows the active file — if a note is moved or renamed, the sidebar
 updates in place rather than going stale.
 
+Related **Relationships** notes render as a grid of cards rather than a list: a
+circle-masked cover photo (from the note's `cover` frontmatter) with the name
+below, and the note's `icon` as a badge on the corner of the photo. Cards are
+ordered most-recently-modified first, and the number per row follows the width
+of the sidebar.
+
 ## Installation
 
 Not in the community plugin list. Install from a release:
