@@ -1,5 +1,11 @@
 import type { App, TFile } from "obsidian";
 
+/** Bullet shown for a list item whose note has no `icon` frontmatter. */
+export const DEFAULT_BULLET = "\u23FA\uFE0F";
+
+/** Bullet for a calendar event that has not been captured as a note yet. */
+export const DEFAULT_EVENT_BULLET = "\u{1F535}";
+
 export function normalizeAreasFrontmatter(
   areas: string | string[],
 ): string[] {

@@ -4,6 +4,8 @@ import { type CalendarEvent, fetchEventsForDate } from "./calendar";
 import type DynamicWidgetPlugin from "./main";
 import {
   areasForCalendar,
+  DEFAULT_BULLET,
+  DEFAULT_EVENT_BULLET,
   formatRelativeDeadline,
   isFilePrivate,
   isValidHex,
@@ -14,9 +16,6 @@ import {
 
 export const VIEW_TYPE_DYNAMIC_WIDGET = "dynamic-widget-view";
 const dayFileNameRegex = /^\d{4}-\d{2}-\d{2}$/;
-
-// Fallback bullet for events with no note icon of their own.
-const DEFAULT_EVENT_ICON = "\u{1F535}";
 
 function formatEventClock(date: Date): { time: string; meridiem: string } {
   const hours = date.getHours();
@@ -727,7 +726,7 @@ export class DynamicWidgetView extends ItemView {
     const activeFile = this.app.workspace.getActiveFile();
 
     // Add emoji bullet class
-    ulEl.classList.add("emoji-bullet-list");
+    ulEl.classList.add("dw-list");
 
     const liEls = list
       .sort((a, b) => {
@@ -764,19 +763,23 @@ export class DynamicWidgetView extends ItemView {
 
         const metadata = this.app.metadataCache.getFileCache(note);
 
-        projectEl.classList.add("emoji-bullet-item");
+        projectEl.classList.add("dw-list-item");
 
         // Extract emoji from the file's path
         const icon = metadata?.frontmatter?.icon;
         if (icon) {
           projectEl.style.setProperty("--emoji-bullet", `"${icon}"`);
         } else {
-          projectEl.style.setProperty("--emoji-bullet", "'⏺️'");
+          projectEl.style.setProperty(
+            "--emoji-bullet",
+            `"${DEFAULT_BULLET}"`,
+          );
         }
 
         const title = metadata?.frontmatter?.title || note.basename;
         const linkEl = projectEl.createEl("a", {
           text: isPrivate ? redactText(title) : title,
+          cls: "dw-list-title",
         });
 
         if (isPrivate) {
@@ -795,7 +798,7 @@ export class DynamicWidgetView extends ItemView {
           if (label) {
             projectEl.createEl("div", {
               text: label,
-              cls: "dynamic-widget-project-deadline",
+              cls: "dw-list-meta",
             });
           }
         }
@@ -1341,11 +1344,11 @@ export class DynamicWidgetView extends ItemView {
 
     const notes = this.eventNotesByCalendarId();
     const ulEl = bodyEl.createEl("ul", {
-      cls: "emoji-bullet-list calendar-events-list",
+      cls: "dw-list",
     });
     for (const ev of events) {
       const liEl = ulEl.createEl("li", {
-        cls: "emoji-bullet-item calendar-event-item",
+        cls: "dw-list-item is-row",
       });
       liEl.setAttribute("role", "button");
       liEl.setAttribute("tabindex", "0");
@@ -1367,17 +1370,19 @@ export class DynamicWidgetView extends ItemView {
       }
 
       const icon = meta?.frontmatter?.icon;
-      liEl.style.setProperty("--emoji-bullet", `"${icon || DEFAULT_EVENT_ICON}"`);
+      liEl.style.setProperty("--emoji-bullet", `"${icon || DEFAULT_EVENT_BULLET}"`);
 
       const titleEl = liEl.createEl("div", {
         text: isPrivate ? redactText(label) : label,
-        cls: "calendar-event-title",
+        cls: "dw-list-title",
       });
       if (isPrivate) {
         titleEl.classList.add("dynamic-widget-private");
       }
 
-      const metaEl = liEl.createEl("div", { cls: "calendar-event-meta" });
+      const metaEl = liEl.createEl("div", {
+        cls: "dw-list-meta calendar-event-meta",
+      });
       metaEl.createEl("span", {
         text: ev.allDay
           ? "All day"
