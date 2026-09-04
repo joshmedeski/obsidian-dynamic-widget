@@ -177,7 +177,17 @@ export function isEventNote(app: App, file: TFile): boolean {
   const frontmatter = app.metadataCache.getFileCache(file)?.frontmatter;
   if (!frontmatter) return false;
   if (typeof frontmatter.calendar_id === "string") return true;
-  return frontmatter.type === "event" || frontmatter.type === "meeting";
+  if (frontmatter.type === "event" || frontmatter.type === "meeting") {
+    return true;
+  }
+  // Older meeting notes (Granola imports especially) predate `type`, but
+  // attendees plus a timestamp is a meeting either way. `with` alone is not
+  // enough -- projects name the people they involve too.
+  const attendees = frontmatter.with;
+  const hasAttendees = Array.isArray(attendees)
+    ? attendees.length > 0
+    : typeof attendees === "string" && attendees.length > 0;
+  return hasAttendees && frontmatter.when != null;
 }
 
 /**

@@ -20,6 +20,8 @@ import {
 } from "./utils";
 
 export const VIEW_TYPE_DYNAMIC_WIDGET = "dynamic-widget-view";
+/** Where a newly captured calendar event is written. */
+const EVENT_NOTES_DIR = "Events";
 const dayFileNameRegex = /^\d{4}-\d{2}-\d{2}$/;
 
 function formatEventClock(date: Date): { time: string; meridiem: string } {
@@ -191,16 +193,24 @@ const INBOX_FOLDER: FolderWithTitle = {
 };
 
 /**
- * Captured calendar events. Matched on frontmatter rather than folder so a
- * note filed out of the Inbox keeps showing up here -- Archives excepted,
- * which is where a note goes to stop being current.
+ * Captured events and meetings. Matched on frontmatter rather than folder,
+ * because they are spread across Events/, Inbox/ and -- overwhelmingly, since
+ * a past meeting gets filed away -- Archives/. Their date is what makes them
+ * findable, so they read better in one dated section than scattered by folder.
  */
 const EVENT_NOTES_FOLDER: FolderWithTitle = {
   folder: "",
   title: "📅 Events",
   layout: "events",
-  match: (app, file) =>
-    !file.path.startsWith("Archives/") && isEventNote(app, file),
+  match: isEventNote,
+};
+
+/** Archives minus the event notes, which the Events section renders instead. */
+const ARCHIVES_FOLDER: FolderWithTitle = {
+  folder: "Archives",
+  title: "🗄️ Archives",
+  timeGroup: { compareRule: "relative-date" },
+  exclude: isEventNote,
 };
 
 const IS_AREA_FOLDERS: FolderWithTitle[] = [
@@ -217,11 +227,7 @@ const IS_AREA_FOLDERS: FolderWithTitle[] = [
     title: "🔮 Someday Maybe",
     timeGroup: { compareRule: "relative-date" },
   },
-  {
-    folder: "Archives",
-    title: "🗄️ Archives",
-    timeGroup: { compareRule: "relative-date" },
-  },
+  ARCHIVES_FOLDER,
 ];
 
 const HAS_AREAS_FOLDERS: FolderWithTitle[] = [
@@ -238,11 +244,7 @@ const HAS_AREAS_FOLDERS: FolderWithTitle[] = [
     title: "🔮 Someday Maybe",
     timeGroup: { compareRule: "relative-date" },
   },
-  {
-    folder: "Archives",
-    title: "🗄️ Archives",
-    timeGroup: { compareRule: "relative-date" },
-  },
+  ARCHIVES_FOLDER,
 ];
 
 const IS_DAILY_FOLDERS: FolderWithTitle[] = [
@@ -267,11 +269,7 @@ const RELATIONSHIP_FOLDERS: FolderWithTitle[] = [
   { folder: "Goals", title: "🎯 Goals" },
   { folder: "Areas", title: "🏠 Areas" },
   { folder: "Resources", title: "📚 Resources" },
-  {
-    folder: "Archives",
-    title: "🗄️ Archives",
-    timeGroup: { compareRule: "relative-date" },
-  },
+  ARCHIVES_FOLDER,
 ];
 
 const NO_ACTIVE_FILE: FolderWithTitle[] = [
@@ -869,10 +867,25 @@ export class DynamicWidgetView extends ItemView {
 
     const sectionEl = document.createElement("section");
     sectionEl.createEl("h3", { text: title });
-    for (const group of [
+
+    const groups: { label: string; entries: typeof dated }[] = [
       { label: "Upcoming", entries: upcoming },
-      { label: "Past", entries: past },
-    ]) {
+    ];
+    // Years of meetings pile up behind an active area, so the past gets the
+    // same relative-date buckets the other sections use -- keyed on the
+    // event's own date rather than when the file was last touched.
+    for (const bucket of this.computeRelativeDateGroups(now)) {
+      groups.push({
+        label: bucket.label,
+        entries: past.filter(
+          (entry) =>
+            entry.date.getTime() >= bucket.minMs &&
+            entry.date.getTime() < bucket.maxMs,
+        ),
+      });
+    }
+
+    for (const group of groups) {
       if (group.entries.length === 0) continue;
       sectionEl.createEl("h4", {
         text: group.label,
@@ -1607,6 +1620,16 @@ export class DynamicWidgetView extends ItemView {
       return;
     }
 
+    // The folder is a plain vault folder, not a plugin-managed one -- a fresh
+    // vault (or a user who deleted it) should not lose the capture.
+    if (!this.app.vault.getAbstractFileByPath(EVENT_NOTES_DIR)) {
+      try {
+        await this.app.vault.createFolder(EVENT_NOTES_DIR);
+      } catch (err) {
+        console.error("Failed to create events folder", err);
+      }
+    }
+
     const path = this.pickEventNotePath(event);
     const content = buildEventNoteContent(
       event,
@@ -1622,18 +1645,20 @@ export class DynamicWidgetView extends ItemView {
 
   private pickEventNotePath(event: CalendarEvent): string {
     const base = buildEventNoteFilename(event);
-    const candidatePath = `Inbox/${base}.md`;
+    const candidatePath = `${EVENT_NOTES_DIR}/${base}.md`;
     if (!this.app.vault.getAbstractFileByPath(candidatePath)) {
       return candidatePath;
     }
     let n = 2;
     while (
-      this.app.vault.getAbstractFileByPath(`Inbox/${base} (${n}).md`) &&
+      this.app.vault.getAbstractFileByPath(
+        `${EVENT_NOTES_DIR}/${base} (${n}).md`,
+      ) &&
       n < 100
     ) {
       n += 1;
     }
-    return `Inbox/${base} (${n}).md`;
+    return `${EVENT_NOTES_DIR}/${base} (${n}).md`;
   }
 
   private renderFolderByArea(
