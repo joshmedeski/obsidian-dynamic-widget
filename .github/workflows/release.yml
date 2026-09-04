@@ -45,6 +45,12 @@ jobs:
           rm -rf build
           npm run build
 
+      - name: Verify release artifacts
+        run: |
+          test -f build/manifest.json || (echo "missing build/manifest.json" && exit 1)
+          test -f build/main.js || (echo "missing build/main.js" && exit 1)
+          test -f build/styles.css || (echo "missing build/styles.css" && exit 1)
+
       - name: Stage release artifacts
         run: |
           mkdir -p release

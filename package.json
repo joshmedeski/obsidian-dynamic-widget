@@ -1,5 +1,5 @@
 {
-  "name": "obsidian-dynamic-widget-staging",
+  "name": "obsidian-dynamic-widget",
   "private": true,
   "scripts": {
     "dev": "vite build --watch --mode development",
