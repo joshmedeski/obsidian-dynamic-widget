@@ -75,15 +75,36 @@ function formatEventDateLabel(date: Date): string {
     .replace(/,/g, "");
 }
 
+const MONTH_NAMES =
+  "jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?" +
+  "|aug(?:ust)?|sept?(?:ember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?";
+const WEEKDAY_NAMES =
+  "(?:mon|tues?|wed(?:nes)?|thur?s?|fri|sat(?:ur)?|sun)(?:day)?\\.?,?\\s+";
+const DAY_OF_MONTH = "\\d{1,2}(?:st|nd|rd|th)?";
+
 /**
- * Note filenames carry the event date for uniqueness ("Call with Bowden (Sep 1
- * 2026)"), which is redundant in a list already scoped to one day. Only strips
- * the suffix this plugin would have generated for *this* event's date, so a
- * title that genuinely ends in parentheses survives.
+ * A trailing parenthesised date: "(Aug 2025)", "(Sep 1 2026)", "(Oct, 2024)",
+ * "(Thu, Aug 21, 2025)", "(2026-07-08)", "(2024)". Only date-shaped content
+ * matches, so "(Session 5)" and "USAF Growth Edge (for 2025)" survive.
  */
-function stripEventDateSuffix(label: string, date: Date): string {
-  const suffix = ` (${formatEventDateLabel(date)})`;
-  return label.endsWith(suffix) ? label.slice(0, -suffix.length) : label;
+const TRAILING_DATE_SUFFIX = new RegExp(
+  `\\s*\\((?:${WEEKDAY_NAMES})?(?:` +
+    "\\d{4}-\\d{2}-\\d{2}" +
+    `|(?:${MONTH_NAMES})\\.?,?\\s+${DAY_OF_MONTH},?\\s+\\d{4}` +
+    `|(?:${MONTH_NAMES})\\.?,?\\s+\\d{4}` +
+    "|\\d{4}" +
+    ")\\)$",
+  "i",
+);
+
+/**
+ * Note filenames carry the event date to keep them unique ("USAF Meeting (Aug
+ * 2025)"), which is noise in a list that prints the date on its own line.
+ * Restores the original if stripping would leave nothing behind.
+ */
+function stripEventDateSuffix(label: string): string {
+  const stripped = label.replace(TRAILING_DATE_SUFFIX, "").trim();
+  return stripped.length > 0 ? stripped : label;
 }
 
 function buildEventNoteFilename(event: CalendarEvent): string {
@@ -921,7 +942,6 @@ export class DynamicWidgetView extends ItemView {
       // The filename carries the date for uniqueness; the row already shows it.
       const label = stripEventDateSuffix(
         meta?.frontmatter?.title || file.basename,
-        date,
       );
 
       const areas = (
@@ -1542,10 +1562,7 @@ export class DynamicWidgetView extends ItemView {
 
       let label = ev.title;
       if (note) {
-        label = stripEventDateSuffix(
-          meta?.frontmatter?.title || note.basename,
-          ev.startDate,
-        );
+        label = stripEventDateSuffix(meta?.frontmatter?.title || note.basename);
       }
 
       // A captured event says more by naming the areas it was filed under than
