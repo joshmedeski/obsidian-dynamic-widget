@@ -15,6 +15,9 @@ import {
 export const VIEW_TYPE_DYNAMIC_WIDGET = "dynamic-widget-view";
 const dayFileNameRegex = /^\d{4}-\d{2}-\d{2}$/;
 
+// Fallback bullet for events with no note icon of their own.
+const DEFAULT_EVENT_ICON = "\u{1F535}";
+
 function formatEventTime(date: Date): string {
   return date.toLocaleTimeString("en-US", {
     hour: "numeric",
@@ -1310,40 +1313,53 @@ export class DynamicWidgetView extends ItemView {
     }
 
     const notes = this.eventNotesByCalendarId();
-    const ulEl = bodyEl.createEl("ul", { cls: "calendar-events-list" });
+    const ulEl = bodyEl.createEl("ul", {
+      cls: "emoji-bullet-list calendar-events-list",
+    });
     for (const ev of events) {
-      const liEl = ulEl.createEl("li", { cls: "calendar-event-item" });
+      const liEl = ulEl.createEl("li", {
+        cls: "emoji-bullet-item calendar-event-item",
+      });
       liEl.setAttribute("role", "button");
       liEl.setAttribute("tabindex", "0");
-      liEl.createEl("span", {
-        text: ev.allDay ? "All day" : formatEventTime(ev.startDate),
-        cls: "calendar-event-time",
-      });
 
       // Once an event has been captured, the note is the thing worth showing --
       // it carries any rename or icon the event title doesn't know about.
       const note = notes.get(ev.id);
-      const titleEl = liEl.createEl("span", {
-        text: ev.title,
-        cls: "calendar-event-title",
-      });
+      const meta = note ? this.app.metadataCache.getFileCache(note) : null;
+      const isPrivate = Boolean(
+        note && this.plugin.privateMode && isFilePrivate(this.app, note),
+      );
+
+      let label = ev.title;
       if (note) {
         liEl.classList.add("has-note");
-        const meta = this.app.metadataCache.getFileCache(note);
-        const label = stripEventDateSuffix(
+        label = stripEventDateSuffix(
           meta?.frontmatter?.title || note.basename,
           ev,
         );
-        if (this.plugin.privateMode && isFilePrivate(this.app, note)) {
-          titleEl.setText(redactText(label));
-          titleEl.classList.add("dynamic-widget-private");
-        } else {
-          const icon = meta?.frontmatter?.icon;
-          titleEl.setText(`${icon ? `${icon} ` : ""}${label}`);
-        }
       }
+
+      const icon = meta?.frontmatter?.icon;
+      liEl.style.setProperty("--emoji-bullet", `"${icon || DEFAULT_EVENT_ICON}"`);
+
+      const titleEl = liEl.createEl("div", {
+        text: isPrivate ? redactText(label) : label,
+        cls: "calendar-event-title",
+      });
+      if (isPrivate) {
+        titleEl.classList.add("dynamic-widget-private");
+      }
+
+      const metaEl = liEl.createEl("div", { cls: "calendar-event-meta" });
+      metaEl.createEl("span", {
+        text: ev.allDay
+          ? "All day"
+          : `${formatEventTime(ev.startDate)} - ${formatEventTime(ev.endDate)}`,
+        cls: "calendar-event-time",
+      });
       if (ev.calendar) {
-        liEl.createEl("span", {
+        metaEl.createEl("span", {
           text: ev.calendar,
           cls: "calendar-event-calendar",
         });
