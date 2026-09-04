@@ -211,6 +211,12 @@
   min-width: 0;
 }
 
+/* An event that already has a note shows the note's title instead, and reads
+   as a link rather than raw calendar text. */
+.calendar-event-item.has-note .calendar-event-title {
+  color: var(--text-accent);
+}
+
 .calendar-event-calendar {
   flex: 0 0 auto;
   font-size: var(--font-smallest);

@@ -39,6 +39,17 @@ function formatEventDateLabel(date: Date): string {
     .replace(/,/g, "");
 }
 
+/**
+ * Note filenames carry the event date for uniqueness ("Call with Bowden (Sep 1
+ * 2026)"), which is redundant in a list already scoped to one day. Only strips
+ * the suffix this plugin would have generated for *this* event's date, so a
+ * title that genuinely ends in parentheses survives.
+ */
+function stripEventDateSuffix(label: string, event: CalendarEvent): string {
+  const suffix = ` (${formatEventDateLabel(event.startDate)})`;
+  return label.endsWith(suffix) ? label.slice(0, -suffix.length) : label;
+}
+
 function buildEventNoteFilename(event: CalendarEvent): string {
   const title = sanitizeFilenameSegment(event.title) || "Event";
   const dateLabel = formatEventDateLabel(event.startDate);
@@ -1298,6 +1309,7 @@ export class DynamicWidgetView extends ItemView {
       return;
     }
 
+    const notes = this.eventNotesByCalendarId();
     const ulEl = bodyEl.createEl("ul", { cls: "calendar-events-list" });
     for (const ev of events) {
       const liEl = ulEl.createEl("li", { cls: "calendar-event-item" });
@@ -1307,10 +1319,29 @@ export class DynamicWidgetView extends ItemView {
         text: ev.allDay ? "All day" : formatEventTime(ev.startDate),
         cls: "calendar-event-time",
       });
-      liEl.createEl("span", {
+
+      // Once an event has been captured, the note is the thing worth showing --
+      // it carries any rename or icon the event title doesn't know about.
+      const note = notes.get(ev.id);
+      const titleEl = liEl.createEl("span", {
         text: ev.title,
         cls: "calendar-event-title",
       });
+      if (note) {
+        liEl.classList.add("has-note");
+        const meta = this.app.metadataCache.getFileCache(note);
+        const label = stripEventDateSuffix(
+          meta?.frontmatter?.title || note.basename,
+          ev,
+        );
+        if (this.plugin.privateMode && isFilePrivate(this.app, note)) {
+          titleEl.setText(redactText(label));
+          titleEl.classList.add("dynamic-widget-private");
+        } else {
+          const icon = meta?.frontmatter?.icon;
+          titleEl.setText(`${icon ? `${icon} ` : ""}${label}`);
+        }
+      }
       if (ev.calendar) {
         liEl.createEl("span", {
           text: ev.calendar,
@@ -1329,11 +1360,24 @@ export class DynamicWidgetView extends ItemView {
     }
   }
 
+  /**
+   * Notes created from calendar events keep the event's id in `calendar_id`.
+   * Built once per render so the events list doesn't rescan the vault per row.
+   */
+  private eventNotesByCalendarId(): Map<string, TFile> {
+    const notes = new Map<string, TFile>();
+    for (const file of this.app.vault.getMarkdownFiles()) {
+      const id = this.app.metadataCache.getFileCache(file)?.frontmatter
+        ?.calendar_id;
+      if (typeof id === "string" && !notes.has(id)) {
+        notes.set(id, file);
+      }
+    }
+    return notes;
+  }
+
   private async openOrCreateEventNote(event: CalendarEvent): Promise<void> {
-    const existing = this.app.vault.getFiles().find((f) => {
-      const meta = this.app.metadataCache.getFileCache(f);
-      return meta?.frontmatter?.calendar_id === event.id;
-    });
+    const existing = this.eventNotesByCalendarId().get(event.id);
 
     if (existing) {
       this.app.workspace.getLeaf("tab").openFile(existing);
