@@ -1,0 +1,11 @@
+{
+  "id": "obsidian-dynamic-widget",
+  "name": "Dynamic Widget",
+  "version": "1.0.0",
+  "minAppVersion": "0.15.0",
+  "description": "A dynamic widget that can change based on the current note or other conditions.",
+  "author": "Josh Medeski",
+  "authorUrl": "https://www.joshmedeski.com",
+  "fundingUrl": "https://www.joshmedeski.com",
+  "isDesktopOnly": false
+}

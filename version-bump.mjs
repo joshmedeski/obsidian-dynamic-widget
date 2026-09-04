@@ -1,14 +1,27 @@
-import { readFileSync, writeFileSync } from "fs";
+import { readFileSync, writeFileSync } from 'node:fs';
 
-const targetVersion = process.env.npm_package_version;
+// Accept the target version as a CLI argument (e.g. `node version-bump.mjs 1.2.0`).
+// Falls back to npm_package_version for `npm version` lifecycle compatibility.
+const targetVersion = process.argv[2] ?? process.env.npm_package_version;
 
-// read minAppVersion from manifest.json and bump version to target version
-let manifest = JSON.parse(readFileSync("manifest.json", "utf8"));
+if (!targetVersion || !/^\d+\.\d+\.\d+(-[\w.]+)?$/.test(targetVersion)) {
+	console.error('Usage: node version-bump.mjs <version>  (e.g. 1.2.0)');
+	console.error(`Received: ${targetVersion ?? '(nothing)'}`);
+	process.exit(1);
+}
+
+// The manifest lives in public/ -- vite-plugin-static-copy copies it into build/.
+const manifestPath = 'public/manifest.json';
+const versionsPath = 'versions.json';
+
+const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
 const { minAppVersion } = manifest;
 manifest.version = targetVersion;
-writeFileSync("manifest.json", JSON.stringify(manifest, null, "\t"));
+writeFileSync(manifestPath, `${JSON.stringify(manifest, null, '\t')}\n`);
 
-// update versions.json with target version and minAppVersion from manifest.json
-let versions = JSON.parse(readFileSync("versions.json", "utf8"));
+const versions = JSON.parse(readFileSync(versionsPath, 'utf8'));
 versions[targetVersion] = minAppVersion;
-writeFileSync("versions.json", JSON.stringify(versions, null, "\t"));
+writeFileSync(versionsPath, `${JSON.stringify(versions, null, '\t')}\n`);
+
+console.log(`Bumped to ${targetVersion} (minAppVersion ${minAppVersion}).`);
+console.log(`Updated ${manifestPath} and ${versionsPath}.`);
