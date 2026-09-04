@@ -1389,11 +1389,24 @@ export class DynamicWidgetView extends ItemView {
           : formatEventTimeRange(ev.startDate, ev.endDate),
         cls: "calendar-event-time",
       });
-      if (ev.calendar) {
-        metaEl.createEl("span", {
-          text: ev.calendar,
-          cls: "calendar-event-calendar",
+      // A captured event says more by naming the areas it was filed under than
+      // by repeating which calendar it came from. Plain names, no icons -- the
+      // bullet already carries the note's icon. Falls back to the calendar when
+      // the note has no areas, or when the event hasn't been captured yet.
+      const noteAreas = note
+        ? (
+            normalizeAreasFrontmatter(meta?.frontmatter?.areas ?? []) ?? []
+          ).map(simplifyWikiLink)
+        : [];
+      const source = noteAreas.length > 0 ? noteAreas.join(", ") : ev.calendar;
+      if (source) {
+        const sourceEl = metaEl.createEl("span", {
+          text: isPrivate ? redactText(source) : source,
+          cls: "calendar-event-source",
         });
+        if (isPrivate) {
+          sourceEl.classList.add("dynamic-widget-private");
+        }
       }
       liEl.addEventListener("click", () => {
         this.openOrCreateEventNote(ev);

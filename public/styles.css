@@ -217,9 +217,10 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* Same size as the time (both inherit --font-smaller from .dw-list-meta);
-   only the color separates them. */
-.calendar-event-calendar {
+/* The areas the event's note is filed under, or the calendar name when it has
+   no note yet. Same size as the time (both inherit --font-smaller from
+   .dw-list-meta); only the color separates them. */
+.calendar-event-source {
   color: var(--text-faint);
 }
 
