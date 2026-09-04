@@ -197,20 +197,17 @@
   outline: none;
 }
 
-.calendar-event-item:hover .calendar-event-title,
-.calendar-event-item:focus-visible .calendar-event-title {
-  color: var(--text-accent);
-}
-
+/* Same treatment as .emoji-bullet-item a: normal text, accent + underline on
+   hover. Whether the event has a note is signalled by the icon, not the color. */
 .calendar-event-title {
   color: var(--text-normal);
   min-width: 0;
 }
 
-/* An event that already has a note shows the note's title instead, and reads
-   as a link rather than raw calendar text. */
-.calendar-event-item.has-note .calendar-event-title {
+.calendar-event-item:hover .calendar-event-title,
+.calendar-event-item:focus-visible .calendar-event-title {
   color: var(--text-accent);
+  text-decoration: underline;
 }
 
 .calendar-event-meta {

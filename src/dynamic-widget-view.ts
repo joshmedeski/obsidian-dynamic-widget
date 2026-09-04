@@ -18,11 +18,38 @@ const dayFileNameRegex = /^\d{4}-\d{2}-\d{2}$/;
 // Fallback bullet for events with no note icon of their own.
 const DEFAULT_EVENT_ICON = "\u{1F535}";
 
-function formatEventTime(date: Date): string {
-  return date.toLocaleTimeString("en-US", {
-    hour: "numeric",
-    minute: "2-digit",
-  });
+function formatEventClock(date: Date): { time: string; meridiem: string } {
+  const hours = date.getHours();
+  const minutes = date.getMinutes();
+  const hour12 = hours % 12 === 0 ? 12 : hours % 12;
+  return {
+    // On-the-hour times drop ":00" -- "11" rather than "11:00".
+    time:
+      minutes === 0
+        ? String(hour12)
+        : `${hour12}:${String(minutes).padStart(2, "0")}`,
+    meridiem: hours < 12 ? "am" : "pm",
+  };
+}
+
+/**
+ * Compact range for a sidebar that has little room: "11-11:30am", "7-9pm",
+ * "11:30am-1pm". The meridiem is written once when both ends share it, which
+ * is the common case for a single meeting, and on both ends when they differ
+ * or when the event runs past midnight into another day.
+ */
+function formatEventTimeRange(start: Date, end: Date): string {
+  const from = formatEventClock(start);
+  const to = formatEventClock(end);
+
+  if (start.getTime() === end.getTime()) {
+    return `${from.time}${from.meridiem}`;
+  }
+
+  const sameDay = start.toDateString() === end.toDateString();
+  const shareMeridiem = sameDay && from.meridiem === to.meridiem;
+  const fromLabel = shareMeridiem ? from.time : `${from.time}${from.meridiem}`;
+  return `${fromLabel}-${to.time}${to.meridiem}`;
 }
 
 function sanitizeFilenameSegment(raw: string): string {
@@ -1333,7 +1360,6 @@ export class DynamicWidgetView extends ItemView {
 
       let label = ev.title;
       if (note) {
-        liEl.classList.add("has-note");
         label = stripEventDateSuffix(
           meta?.frontmatter?.title || note.basename,
           ev,
@@ -1355,7 +1381,7 @@ export class DynamicWidgetView extends ItemView {
       metaEl.createEl("span", {
         text: ev.allDay
           ? "All day"
-          : `${formatEventTime(ev.startDate)} - ${formatEventTime(ev.endDate)}`,
+          : formatEventTimeRange(ev.startDate, ev.endDate),
         cls: "calendar-event-time",
       });
       if (ev.calendar) {
