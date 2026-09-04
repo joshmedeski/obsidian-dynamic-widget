@@ -167,3 +167,111 @@ function deadlineToLocalDay(
   }
   return null;
 }
+
+/**
+ * Notes captured from a calendar event carry `calendar_id`; ones written by
+ * hand only declare `type: event` / `type: meeting`. Either marks the note as
+ * belonging in the Events section rather than the Inbox.
+ */
+export function isEventNote(app: App, file: TFile): boolean {
+  const frontmatter = app.metadataCache.getFileCache(file)?.frontmatter;
+  if (!frontmatter) return false;
+  if (typeof frontmatter.calendar_id === "string") return true;
+  return frontmatter.type === "event" || frontmatter.type === "meeting";
+}
+
+/**
+ * When an event note happened, from its `when` frontmatter. Falls back to the
+ * file's creation time so a hand-written note with no `when` still sorts.
+ * `hasTime` is false for all-day events (`when: 2026-09-04`), which should
+ * render without a clock.
+ */
+export function eventNoteWhen(
+  app: App,
+  file: TFile,
+): { date: Date; hasTime: boolean } {
+  const when = app.metadataCache.getFileCache(file)?.frontmatter?.when;
+  const parsed = parseEventWhen(when);
+  return parsed ?? { date: new Date(file.stat.ctime), hasTime: true };
+}
+
+function parseEventWhen(
+  when: unknown,
+): { date: Date; hasTime: boolean } | null {
+  if (typeof when === "string") {
+    const dateOnly = /^(\d{4})-(\d{2})-(\d{2})$/.exec(when.trim());
+    if (dateOnly) {
+      return {
+        date: new Date(
+          Number(dateOnly[1]),
+          Number(dateOnly[2]) - 1,
+          Number(dateOnly[3]),
+        ),
+        hasTime: false,
+      };
+    }
+    // `2026-09-04T09:30:00` with no offset is parsed as local time, which is
+    // how this plugin writes it.
+    const parsed = new Date(when);
+    return Number.isNaN(parsed.getTime())
+      ? null
+      : { date: parsed, hasTime: true };
+  }
+  // Unquoted YAML dates arrive as Date objects pinned to UTC midnight, which
+  // is the previous local day west of UTC -- read the UTC fields back out.
+  if (when instanceof Date) {
+    if (Number.isNaN(when.getTime())) return null;
+    const isMidnightUtc =
+      when.getUTCHours() === 0 &&
+      when.getUTCMinutes() === 0 &&
+      when.getUTCSeconds() === 0;
+    if (isMidnightUtc) {
+      return {
+        date: new Date(
+          when.getUTCFullYear(),
+          when.getUTCMonth(),
+          when.getUTCDate(),
+        ),
+        hasTime: false,
+      };
+    }
+    return { date: when, hasTime: true };
+  }
+  if (typeof when === "number") {
+    const parsed = new Date(when);
+    return Number.isNaN(parsed.getTime())
+      ? null
+      : { date: parsed, hasTime: true };
+  }
+  return null;
+}
+
+/** "Tue, Sep 2" for an all-day event, "Tue, Sep 2 · 9:30am" otherwise. */
+export function formatEventNoteWhen(date: Date, hasTime: boolean): string {
+  const day = date.toLocaleDateString("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    // Only worth the space once the event is outside the current year.
+    year:
+      date.getFullYear() === new Date().getFullYear() ? undefined : "numeric",
+  });
+  if (!hasTime) return day;
+  const time = date
+    .toLocaleTimeString("en-US", {
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+    })
+    .replace(/\s?(AM|PM)$/i, (_, p) => p.toLowerCase());
+  return `${day} · ${time}`;
+}
+
+/** Whether two dates land on the same local calendar day. */
+export function isSameLocalDay(a: Date, b: Date): boolean {
+  return (
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate()
+  );
+}

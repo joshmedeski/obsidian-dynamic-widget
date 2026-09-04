@@ -1,4 +1,4 @@
-import { ItemView, TFile, type WorkspaceLeaf } from "obsidian";
+import { type App, ItemView, TFile, type WorkspaceLeaf } from "obsidian";
 import { collectAreaNames, getAreaHierarchy } from "./areas-hierarchy";
 import { type CalendarEvent, fetchEventsForDate } from "./calendar";
 import type DynamicWidgetPlugin from "./main";
@@ -7,8 +7,12 @@ import {
   areasForCalendar,
   DEFAULT_BULLET,
   DEFAULT_EVENT_BULLET,
+  eventNoteWhen,
+  formatEventNoteWhen,
   formatRelativeDeadline,
+  isEventNote,
   isFilePrivate,
+  isSameLocalDay,
   isValidHex,
   normalizeAreasFrontmatter,
   redactText,
@@ -75,8 +79,8 @@ function formatEventDateLabel(date: Date): string {
  * the suffix this plugin would have generated for *this* event's date, so a
  * title that genuinely ends in parentheses survives.
  */
-function stripEventDateSuffix(label: string, event: CalendarEvent): string {
-  const suffix = ` (${formatEventDateLabel(event.startDate)})`;
+function stripEventDateSuffix(label: string, date: Date): string {
+  const suffix = ` (${formatEventDateLabel(date)})`;
   return label.endsWith(suffix) ? label.slice(0, -suffix.length) : label;
 }
 
@@ -165,19 +169,48 @@ type TimeGroup =
   | { compareRule: "day-heatmap" };
 
 type FolderWithTitle = {
+  /** Path prefix the section collects, unless `match` overrides it. */
   folder: string;
   title: string;
   timeGroup?: TimeGroup;
-  layout?: "grid";
+  layout?: "grid" | "events";
+  /**
+   * Frontmatter-driven sections (Events) live across folders, so they select
+   * their files by predicate instead of by path prefix.
+   */
+  match?: (app: App, file: TFile) => boolean;
+  /** Drops files another section owns -- Inbox hands its events to Events. */
+  exclude?: (app: App, file: TFile) => boolean;
+};
+
+/** Inbox minus the event notes, which the Events section renders instead. */
+const INBOX_FOLDER: FolderWithTitle = {
+  folder: "Inbox",
+  title: "📥 Inbox",
+  exclude: isEventNote,
+};
+
+/**
+ * Captured calendar events. Matched on frontmatter rather than folder so a
+ * note filed out of the Inbox keeps showing up here -- Archives excepted,
+ * which is where a note goes to stop being current.
+ */
+const EVENT_NOTES_FOLDER: FolderWithTitle = {
+  folder: "",
+  title: "📅 Events",
+  layout: "events",
+  match: (app, file) =>
+    !file.path.startsWith("Archives/") && isEventNote(app, file),
 };
 
 const IS_AREA_FOLDERS: FolderWithTitle[] = [
   { folder: "Areas", title: "🏠 Areas" },
-  { folder: "Inbox", title: "📥 Inbox" },
+  INBOX_FOLDER,
   { folder: "Goals", title: "🎯 Goals" },
   { folder: "Projects/Active", title: "✅ Active Projects" },
   { folder: "Projects/Waiting For", title: "⏳ Waiting For" },
   { folder: "Relationships", title: "👥 Relationships", layout: "grid" },
+  EVENT_NOTES_FOLDER,
   { folder: "Resources", title: "📚 Resources" },
   {
     folder: "Projects/Someday Maybe",
@@ -193,11 +226,12 @@ const IS_AREA_FOLDERS: FolderWithTitle[] = [
 
 const HAS_AREAS_FOLDERS: FolderWithTitle[] = [
   { folder: "Areas", title: "🏠 Areas" },
-  { folder: "Inbox", title: "📥 Inbox" },
+  INBOX_FOLDER,
   { folder: "Goals", title: "🎯 Goals" },
   { folder: "Projects/Active", title: "✅ Active Projects" },
   { folder: "Projects/Waiting For", title: "⏳ Waiting For" },
   { folder: "Relationships", title: "👥 Relationships", layout: "grid" },
+  EVENT_NOTES_FOLDER,
   { folder: "Resources", title: "📚 Resources" },
   {
     folder: "Projects/Someday Maybe",
@@ -212,15 +246,11 @@ const HAS_AREAS_FOLDERS: FolderWithTitle[] = [
 ];
 
 const IS_DAILY_FOLDERS: FolderWithTitle[] = [
-  {
-    folder: "Inbox",
-    title: "📥 Inbox",
-    timeGroup: { compareRule: "relative-date" },
-  },
+  { ...INBOX_FOLDER, timeGroup: { compareRule: "relative-date" } },
 ];
 
 const RELATIONSHIP_FOLDERS: FolderWithTitle[] = [
-  { folder: "Inbox", title: "📥 Inbox" },
+  INBOX_FOLDER,
   { folder: "Projects/Active", title: "✅ Active Projects" },
   { folder: "Projects/Waiting For", title: "⏳ Waiting For" },
   {
@@ -228,6 +258,7 @@ const RELATIONSHIP_FOLDERS: FolderWithTitle[] = [
     title: "🔮 Someday Maybe",
     timeGroup: { compareRule: "relative-date" },
   },
+  EVENT_NOTES_FOLDER,
   {
     folder: "Days",
     title: "📅 Days",
@@ -244,11 +275,7 @@ const RELATIONSHIP_FOLDERS: FolderWithTitle[] = [
 ];
 
 const NO_ACTIVE_FILE: FolderWithTitle[] = [
-  {
-    folder: "Inbox",
-    title: "📥 Inbox",
-    timeGroup: { compareRule: "relative-date" },
-  },
+  { ...INBOX_FOLDER, timeGroup: { compareRule: "relative-date" } },
 ];
 
 type FilesByFolder = { folder: FolderWithTitle; files: TFile[] }[];
@@ -812,18 +839,124 @@ export class DynamicWidgetView extends ItemView {
     return ulEl;
   }
 
+  /**
+   * Event notes read by date, not by modification time: what is coming up
+   * matters more than what was touched last. Upcoming runs soonest-first so
+   * the next thing sits at the top of its group; past runs newest-first.
+   */
+  private makeEventNotesList(title: string, files: TFile[]): Element {
+    if (files.length === 0) {
+      return document.createElement("div");
+    }
+
+    const dated = files.map((file) => ({
+      file,
+      ...eventNoteWhen(this.app, file),
+    }));
+    const now = new Date();
+    const startOfToday = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate(),
+    ).getTime();
+
+    const upcoming = dated
+      .filter((entry) => entry.date.getTime() >= startOfToday)
+      .sort((a, b) => a.date.getTime() - b.date.getTime());
+    const past = dated
+      .filter((entry) => entry.date.getTime() < startOfToday)
+      .sort((a, b) => b.date.getTime() - a.date.getTime());
+
+    const sectionEl = document.createElement("section");
+    sectionEl.createEl("h3", { text: title });
+    for (const group of [
+      { label: "Upcoming", entries: upcoming },
+      { label: "Past", entries: past },
+    ]) {
+      if (group.entries.length === 0) continue;
+      sectionEl.createEl("h4", {
+        text: group.label,
+        cls: "dynamic-widget-time-group-label",
+      });
+      sectionEl.appendChild(this.makeEventNoteRows(group.entries));
+    }
+    return sectionEl;
+  }
+
+  private makeEventNoteRows(
+    entries: { file: TFile; date: Date; hasTime: boolean }[],
+  ): Element {
+    const activeFile = this.app.workspace.getActiveFile();
+    const ulEl = document.createElement("ul");
+    ulEl.classList.add("dw-list");
+
+    for (const { file, date, hasTime } of entries) {
+      const liEl = ulEl.createEl("li", { cls: "dw-list-item is-row" });
+      const meta = this.app.metadataCache.getFileCache(file);
+      const isPrivate = Boolean(
+        this.plugin.privateMode && isFilePrivate(this.app, file),
+      );
+
+      // The filename carries the date for uniqueness; the row already shows it.
+      const label = stripEventDateSuffix(
+        meta?.frontmatter?.title || file.basename,
+        date,
+      );
+
+      const areas = (
+        normalizeAreasFrontmatter(meta?.frontmatter?.areas ?? []) ?? []
+      ).map(simplifyWikiLink);
+      const icon =
+        meta?.frontmatter?.icon ||
+        (areas.length > 0 ? areaIcon(this.app, areas[0]) : undefined) ||
+        DEFAULT_EVENT_BULLET;
+      liEl.style.setProperty("--emoji-bullet", `"${icon}"`);
+
+      const isActive = activeFile?.path === file.path;
+      const titleEl = liEl.createEl(isActive ? "span" : "div", {
+        text: isPrivate ? redactText(label) : label,
+        cls: isActive ? "dynamic-widget-active-file" : "dw-list-title",
+      });
+      if (isPrivate) {
+        titleEl.classList.add("dynamic-widget-private");
+      }
+
+      liEl.createEl("div", {
+        text: formatEventNoteWhen(date, hasTime),
+        cls: "dw-list-meta calendar-event-meta",
+      });
+
+      if (isActive) continue;
+
+      const open = (event: Event): void => {
+        event.preventDefault();
+        this.app.workspace.getLeaf("tab").openFile(file);
+      };
+      liEl.setAttribute("role", "button");
+      liEl.setAttribute("tabindex", "0");
+      liEl.addEventListener("click", open);
+      liEl.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" || event.key === " ") open(event);
+      });
+    }
+    return ulEl;
+  }
+
   private filesByFolders(
     allFiles: TFile[],
     folders: FolderWithTitle[],
   ): FilesByFolder {
     const notesByFolder: FilesByFolder = [];
     for (const folderWithTitle of folders) {
+      const { match, exclude } = folderWithTitle;
       const files = allFiles
-        .filter(
-          (file) =>
-            file.path.startsWith(folderWithTitle.folder) &&
-            file.extension === "md",
-        )
+        .filter((file) => {
+          if (file.extension !== "md") return false;
+          if (exclude?.(this.app, file)) return false;
+          return match
+            ? match(this.app, file)
+            : file.path.startsWith(folderWithTitle.folder);
+        })
         .sort((a, b) => b.stat.mtime - a.stat.mtime);
       if (files) {
         notesByFolder.push({ folder: folderWithTitle, files });
@@ -839,6 +972,9 @@ export class DynamicWidgetView extends ItemView {
     const { timeGroup } = folder;
     if (folder.layout === "grid") {
       return this.makeCoverGrid(folder.title, files);
+    }
+    if (folder.layout === "events") {
+      return this.makeEventNotesList(folder.title, files);
     }
     if (!timeGroup) {
       return this.makeUlLinkListWithTitle(folder.title, files);
@@ -1321,12 +1457,33 @@ export class DynamicWidgetView extends ItemView {
 
     fetchEventsForDate(date).then((events) => {
       if (!sectionEl.isConnected) return;
+      // No calendar access (or the helper failed): the notes already captured
+      // for this day are the next best answer, so fall back to them rather
+      // than dropping the section and showing the day no events at all.
       if (events === null) {
-        sectionEl.remove();
+        const captured = this.eventNotesForDate(date);
+        if (captured.length === 0) {
+          sectionEl.remove();
+          return;
+        }
+        bodyEl.empty();
+        bodyEl.appendChild(this.makeEventNoteRows(captured));
         return;
       }
       this.populateCalendarEvents(bodyEl, events);
     });
+  }
+
+  /** Captured event notes whose `when` lands on `date`, earliest first. */
+  private eventNotesForDate(
+    date: Date,
+  ): { file: TFile; date: Date; hasTime: boolean }[] {
+    return this.app.vault
+      .getMarkdownFiles()
+      .filter((file) => isEventNote(this.app, file))
+      .map((file) => ({ file, ...eventNoteWhen(this.app, file) }))
+      .filter((entry) => isSameLocalDay(entry.date, date))
+      .sort((a, b) => a.date.getTime() - b.date.getTime());
   }
 
   private populateCalendarEvents(
@@ -1366,7 +1523,7 @@ export class DynamicWidgetView extends ItemView {
       if (note) {
         label = stripEventDateSuffix(
           meta?.frontmatter?.title || note.basename,
-          ev,
+          ev.startDate,
         );
       }
 
