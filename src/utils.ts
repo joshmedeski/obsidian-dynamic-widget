@@ -23,6 +23,28 @@ export function areaIcon(app: App, areaName: string): string | undefined {
   return typeof icon === "string" && icon.length > 0 ? icon : undefined;
 }
 
+/**
+ * The bullet a note renders with: its own `icon`, else the icon of the first
+ * area it is filed under, else `fallback`. Inheriting the area's icon means an
+ * unadorned note still reads as belonging somewhere.
+ */
+export function noteBullet(
+  app: App,
+  file: TFile,
+  fallback: string = DEFAULT_BULLET,
+): string {
+  const frontmatter = app.metadataCache.getFileCache(file)?.frontmatter;
+  const icon = frontmatter?.icon;
+  if (typeof icon === "string" && icon.length > 0) return icon;
+
+  const areas = normalizeAreasFrontmatter(frontmatter?.areas ?? []) ?? [];
+  const firstArea = areas[0];
+  return (
+    (firstArea ? areaIcon(app, simplifyWikiLink(firstArea)) : undefined) ??
+    fallback
+  );
+}
+
 export function isFilePrivate(app: App, file: TFile): boolean {
   const metadata = app.metadataCache.getFileCache(file);
   if (metadata?.frontmatter?.private === true) return true;

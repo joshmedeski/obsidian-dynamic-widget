@@ -3,9 +3,7 @@ import { collectAreaNames, getAreaHierarchy } from "./areas-hierarchy";
 import { type CalendarEvent, fetchEventsForDate } from "./calendar";
 import type DynamicWidgetPlugin from "./main";
 import {
-  areaIcon,
   areasForCalendar,
-  DEFAULT_BULLET,
   DEFAULT_EVENT_BULLET,
   eventNoteWhen,
   formatEventNoteWhen,
@@ -13,6 +11,7 @@ import {
   isEventNote,
   isFilePrivate,
   isSameLocalDay,
+  noteBullet,
   isValidHex,
   normalizeAreasFrontmatter,
   redactText,
@@ -820,16 +819,10 @@ export class DynamicWidgetView extends ItemView {
 
         projectEl.classList.add("dw-list-item");
 
-        // Extract emoji from the file's path
-        const icon = metadata?.frontmatter?.icon;
-        if (icon) {
-          projectEl.style.setProperty("--emoji-bullet", `"${icon}"`);
-        } else {
-          projectEl.style.setProperty(
-            "--emoji-bullet",
-            `"${DEFAULT_BULLET}"`,
-          );
-        }
+        projectEl.style.setProperty(
+          "--emoji-bullet",
+          `"${noteBullet(this.app, note)}"`,
+        );
 
         const title = metadata?.frontmatter?.title || note.basename;
         const linkEl = projectEl.createEl("a", {
@@ -944,14 +937,10 @@ export class DynamicWidgetView extends ItemView {
         meta?.frontmatter?.title || file.basename,
       );
 
-      const areas = (
-        normalizeAreasFrontmatter(meta?.frontmatter?.areas ?? []) ?? []
-      ).map(simplifyWikiLink);
-      const icon =
-        meta?.frontmatter?.icon ||
-        (areas.length > 0 ? areaIcon(this.app, areas[0]) : undefined) ||
-        DEFAULT_EVENT_BULLET;
-      liEl.style.setProperty("--emoji-bullet", `"${icon}"`);
+      liEl.style.setProperty(
+        "--emoji-bullet",
+        `"${noteBullet(this.app, file, DEFAULT_EVENT_BULLET)}"`,
+      );
 
       const isActive = activeFile?.path === file.path;
       const titleEl = liEl.createEl(isActive ? "span" : "div", {
@@ -1576,10 +1565,9 @@ export class DynamicWidgetView extends ItemView {
         : [];
 
       // Note's own icon, else the first area's, else the generic event bullet.
-      const icon =
-        meta?.frontmatter?.icon ||
-        (noteAreas.length > 0 ? areaIcon(this.app, noteAreas[0]) : undefined) ||
-        DEFAULT_EVENT_BULLET;
+      const icon = note
+        ? noteBullet(this.app, note, DEFAULT_EVENT_BULLET)
+        : DEFAULT_EVENT_BULLET;
       liEl.style.setProperty("--emoji-bullet", `"${icon}"`);
 
       const titleEl = liEl.createEl("div", {

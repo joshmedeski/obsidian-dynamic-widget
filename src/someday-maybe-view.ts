@@ -2,11 +2,11 @@ import { ItemView, type TFile, type WorkspaceLeaf } from "obsidian";
 import { type AreaNode, getAreaHierarchy } from "./areas-hierarchy";
 import type DynamicWidgetPlugin from "./main";
 import {
-  DEFAULT_BULLET,
   formatRelativeDeadline,
   isFilePrivate,
   isValidHex,
   normalizeAreasFrontmatter,
+  noteBullet,
   redactText,
   simplifyWikiLink,
 } from "./utils";
@@ -223,8 +223,10 @@ export class SomedayMaybeView extends ItemView {
         this.plugin.privateMode && isFilePrivate(this.app, note);
 
       const metadata = this.app.metadataCache.getFileCache(note);
-      const icon = metadata?.frontmatter?.icon;
-      li.style.setProperty("--emoji-bullet", `"${icon || DEFAULT_BULLET}"`);
+      li.style.setProperty(
+        "--emoji-bullet",
+        `"${noteBullet(this.app, note)}"`,
+      );
 
       const title = metadata?.frontmatter?.title || note.basename;
       const linkEl = li.createEl("a", {
