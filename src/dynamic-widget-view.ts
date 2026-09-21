@@ -1994,15 +1994,19 @@ export class DynamicWidgetView extends ItemView {
       return;
     }
 
+    const activeFileType = this.determineActiveFileType(activeFile);
+
     // Cover art, then suggestions, then the type-specific body. Hoisted out of
     // the per-type renderers so both stay pinned to the top for every note.
     this.renderMedia({
       cover: this.app.metadataCache.getFileCache(activeFile)?.frontmatter?.cover,
       activeFilePath: activeFile.path,
     });
-    this.renderAreaSuggestions(activeFile);
+    // A day note is a journal page, not something that gets filed under areas.
+    if (activeFileType !== "day") {
+      this.renderAreaSuggestions(activeFile);
+    }
 
-    const activeFileType = this.determineActiveFileType(activeFile);
     switch (activeFileType) {
       case "area":
         this.renderAreaContent(activeFile);
