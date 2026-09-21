@@ -1,4 +1,6 @@
-import { execFile } from "node:child_process";
+import { Platform } from "obsidian";
+
+type ExecFile = typeof import("node:child_process").execFile;
 
 const ICAL_BINARY = "/Users/joshmedeski/go/bin/ical";
 const FETCH_TIMEOUT_MS = 3000;
@@ -53,8 +55,25 @@ function formatDate(date: Date): string {
   return `${y}-${m}-${d}`;
 }
 
+function loadExecFile(): ExecFile | null {
+  if (!Platform.isDesktopApp || !Platform.isMacOS) return null;
+  const load = (window as unknown as { require?: (id: string) => unknown })
+    .require;
+  if (!load) return null;
+  try {
+    return (load("node:child_process") as { execFile: ExecFile }).execFile;
+  } catch {
+    return null;
+  }
+}
+
 function runIcal(from: string, to: string): Promise<string> {
   return new Promise((resolve, reject) => {
+    const execFile = loadExecFile();
+    if (!execFile) {
+      reject(new Error("Calendar events need a macOS desktop vault"));
+      return;
+    }
     execFile(
       ICAL_BINARY,
       ["list", "--from", from, "--to", to, "--output", "json"],
@@ -121,7 +140,7 @@ function parseEvents(stdout: string): CalendarEvent[] {
 export async function fetchEventsForDate(
   date: Date,
 ): Promise<CalendarEvent[] | null> {
-  if (process.platform !== "darwin") return null;
+  if (!Platform.isDesktopApp || !Platform.isMacOS) return null;
 
   const key = formatDate(date);
   const now = Date.now();

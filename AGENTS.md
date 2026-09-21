@@ -131,5 +131,13 @@ and publishes a GitHub release with `main.js`, `manifest.json`, `styles.css`, an
   id, so changing it resets the user's settings.
 - Use `this.app` for Vault/Workspace access; register every listener and interval
   through `this.register*` so unload actually cleans up.
+- **No top-level `node:` imports.** `manifest.json` sets `isDesktopOnly: false`,
+  and `vite.config.ts` externalises every builtin — so a top-level
+  `import ... from "node:*"` becomes a top-level `require` that throws on
+  mobile before the plugin loads. Desktop-only code loads its module lazily,
+  inside a `Platform.isDesktopApp` guard, the way `src/calendar.ts` reaches
+  `node:child_process`. `require("obsidian")` is the only import that may sit
+  at the top of the bundle; check with
+  `grep -o 'require("[^"]*")' build/main.js`.
 - Imports may use the `@/` alias for `src/` (configured in both `vite.config.ts` and
   `tsconfig.json`).
