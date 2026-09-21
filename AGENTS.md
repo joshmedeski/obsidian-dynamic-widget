@@ -52,6 +52,30 @@ Two consequences that matter:
 
 If the symlink is missing (fresh clone), recreate it — see `CONTRIBUTING.md`.
 
+## Area suggestions
+
+Notes with no `areas:` frontmatter render a **Suggested Areas** section in the
+sidebar widget. It shells out to the `vault-areas` classifier in
+`~/c/decision-engine`:
+
+```bash
+uv run --project ~/c/decision-engine classify-note <abs note path> --json --vault <vault path>
+```
+
+`src/area-suggestion.ts` owns the subprocess and parses that JSON; the widget
+only renders it. Consequences:
+
+- **`uv` and the `decision-engine` checkout are required** for the section to
+  work. Without them the section renders the stderr from the failed spawn
+  instead of results — the rest of the widget is unaffected.
+- The classifier runs **only when the button is clicked**, never on note open.
+  `updateContent` fires on every `active-leaf-change` and metadata change, so
+  spawning there would mean a process per keystroke.
+- Results are cached per `path:mtime` for the life of the view, so switching
+  notes and back doesn't re-run it; editing the note invalidates the entry.
+- The JSON payload shape is defined by `vault_areas.to_dict`, not by the CLI.
+  Changing it means changing both repos.
+
 ## Releases
 
 Tag-driven. The tag must match `public/manifest.json`'s `version`, no `v` prefix:

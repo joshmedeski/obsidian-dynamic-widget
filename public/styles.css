@@ -601,3 +601,46 @@
   overflow: hidden;
 }
 
+
+.dw-area-suggestion-run {
+  font-size: var(--font-smaller);
+  cursor: pointer;
+}
+
+.dw-area-suggestion-run:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.dw-area-suggestion-score {
+  font-size: var(--font-smaller);
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+  margin-left: 6px;
+}
+
+.dw-area-suggestion-abstained,
+.dw-area-suggestion-error {
+  font-size: var(--font-smaller);
+  color: var(--text-muted);
+}
+
+.dw-area-suggestion-error {
+  color: var(--text-error);
+}
+
+.dw-area-suggestion-json {
+  margin-top: 8px;
+}
+
+.dw-area-suggestion-json summary {
+  font-size: var(--font-smaller);
+  color: var(--text-faint);
+  cursor: pointer;
+}
+
+.dw-area-suggestion-json pre {
+  max-height: 260px;
+  overflow: auto;
+  font-size: var(--font-smallest);
+}

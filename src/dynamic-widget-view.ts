@@ -1,9 +1,12 @@
 import { type App, ItemView, TFile, type WorkspaceLeaf } from "obsidian";
 import { collectAreaNames, getAreaHierarchy } from "./areas-hierarchy";
+import { type AreaSuggestion, suggestAreas } from "./area-suggestion";
 import { type CalendarEvent, fetchEventsForDate } from "./calendar";
 import type DynamicWidgetPlugin from "./main";
 import {
+  areaIcon,
   areasForCalendar,
+  DEFAULT_BULLET,
   DEFAULT_EVENT_BULLET,
   eventNoteWhen,
   formatEventNoteWhen,
@@ -309,6 +312,7 @@ type FilesByFolder = { folder: FolderWithTitle; files: TFile[] }[];
 export class DynamicWidgetView extends ItemView {
   contentEl: HTMLElement = document.createElement("div");
   private plugin: DynamicWidgetPlugin;
+  private suggestionCache = new Map<string, AreaSuggestion>();
 
   constructor(leaf: WorkspaceLeaf, plugin: DynamicWidgetPlugin) {
     super(leaf);
@@ -1772,6 +1776,106 @@ export class DynamicWidgetView extends ItemView {
     this.contentEl.appendChild(sectionEl);
   }
 
+  private renderAreaSuggestions(activeFile: TFile): void {
+    if (this.plugin.privateMode && isFilePrivate(this.app, activeFile)) {
+      return;
+    }
+
+    const sectionEl = this.contentEl.createEl("section", {
+      cls: "dw-area-suggestion",
+    });
+    sectionEl.createEl("h3", { text: "🧭 Suggested Areas" });
+
+    const cacheKey = `${activeFile.path}:${activeFile.stat.mtime}`;
+    const bodyEl = sectionEl.createEl("div");
+    const cached = this.suggestionCache.get(cacheKey);
+
+    if (cached) {
+      this.renderSuggestionResult(bodyEl, activeFile, cached);
+      return;
+    }
+
+    const buttonEl = bodyEl.createEl("button", {
+      text: "Suggest areas",
+      cls: "dw-area-suggestion-run",
+    });
+    buttonEl.addEventListener("click", async () => {
+      buttonEl.disabled = true;
+      buttonEl.setText("Classifying…");
+      try {
+        const result = await suggestAreas(this.app, activeFile);
+        this.suggestionCache.set(cacheKey, result);
+        if (this.app.workspace.getActiveFile()?.path !== activeFile.path) {
+          return;
+        }
+        bodyEl.empty();
+        this.renderSuggestionResult(bodyEl, activeFile, result);
+      } catch (error) {
+        bodyEl.empty();
+        bodyEl.createEl("div", {
+          text: error instanceof Error ? error.message : String(error),
+          cls: "dw-area-suggestion-error",
+        });
+      }
+    });
+  }
+
+  private renderSuggestionResult(
+    bodyEl: HTMLElement,
+    activeFile: TFile,
+    result: AreaSuggestion,
+  ): void {
+    if (result.abstained) {
+      bodyEl.createEl("div", {
+        text: `No confident match — falls back to ${result.areas.join(" ")}`,
+        cls: "dw-area-suggestion-abstained",
+      });
+    } else {
+      const ulEl = bodyEl.createEl("ul", { cls: "dw-list" });
+      for (const choice of result.choices) {
+        const liEl = ulEl.createEl("li", { cls: "dw-list-item" });
+        liEl.style.setProperty(
+          "--emoji-bullet",
+          `"${areaIcon(this.app, choice.area) ?? DEFAULT_BULLET}"`,
+        );
+
+        const linkEl = liEl.createEl("a", {
+          text: choice.area,
+          cls: "dw-list-title",
+        });
+        const areaFile = this.app.metadataCache.getFirstLinkpathDest(
+          choice.area,
+          activeFile.path,
+        );
+        if (areaFile) {
+          linkEl.addEventListener("click", (event) => {
+            event.preventDefault();
+            this.app.workspace.getLeaf("tab").openFile(areaFile);
+          });
+        }
+
+        liEl.createEl("span", {
+          text: choice.score.toFixed(2),
+          cls: "dw-area-suggestion-score",
+        });
+
+        const trail = choice.lineage.join(" ‹ ");
+        liEl.createEl("div", {
+          text: trail ? `${trail} · ${choice.rationale}` : choice.rationale,
+          cls: "dw-list-meta",
+        });
+      }
+    }
+
+    const detailsEl = bodyEl.createEl("details", {
+      cls: "dw-area-suggestion-json",
+    });
+    detailsEl.createEl("summary", { text: `JSON (${result.strategy})` });
+    detailsEl.createEl("pre").createEl("code", {
+      text: JSON.stringify(result, null, 2),
+    });
+  }
+
   private updateContent() {
     if (!this.contentEl) {
       return;
@@ -1815,6 +1919,7 @@ export class DynamicWidgetView extends ItemView {
         this.renderRelationshipContent(activeFile);
         break;
       default:
+        this.renderAreaSuggestions(activeFile);
         break;
     }
   }
