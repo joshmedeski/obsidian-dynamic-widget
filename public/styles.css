@@ -612,11 +612,18 @@
   opacity: 0.6;
 }
 
+/* Sibling of the title rather than a child, so row hover does not underline
+   it along with the title text. */
 .dw-area-suggestion-score {
   font-size: var(--font-smaller);
   color: var(--text-faint);
   font-variant-numeric: tabular-nums;
-  margin-left: 6px;
+  margin-left: 0.4em;
+}
+
+/* Keeps a long area name from running under the apply button. */
+.dw-area-suggestion .dw-list-item {
+  padding-right: 2.4em;
 }
 
 .dw-area-suggestion-abstained,
@@ -649,10 +656,12 @@
    already in the note's frontmatter stays visible and inert instead, marking
    what has been taken while the rest of the list remains usable. */
 .dw-area-suggestion-apply {
+  position: absolute;
+  right: var(--dw-row-inset-x);
+  top: var(--dw-row-inset-y);
   font-size: var(--font-smallest);
   line-height: 1;
   padding: 2px 6px;
-  margin-left: 6px;
   cursor: pointer;
   opacity: 0;
 }

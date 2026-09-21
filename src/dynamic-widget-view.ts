@@ -1897,7 +1897,7 @@ export class DynamicWidgetView extends ItemView {
           activeFile.path,
         );
 
-        const { titleEl } = this.makeIconRow(ulEl, {
+        const { liEl } = this.makeIconRow(ulEl, {
           bullet: areaIcon(this.app, choice.area) ?? DEFAULT_BULLET,
           title: choice.area,
           description: lineage.length > 0 ? lineage.join(" \u2039 ") : undefined,
@@ -1908,12 +1908,15 @@ export class DynamicWidgetView extends ItemView {
             : undefined,
         });
 
-        titleEl.createEl("span", {
+        // Both are siblings of the title, not children: an inline-block button
+        // inside it sits on the text baseline and drags the title down out of
+        // line with the absolutely positioned icon.
+        liEl.createEl("span", {
           text: choice.score.toFixed(2),
           cls: "dw-area-suggestion-score",
         });
 
-        this.renderApplyButton(titleEl, activeFile, choice.area, applied);
+        this.renderApplyButton(liEl, activeFile, choice.area, applied);
       }
     }
 
@@ -1927,13 +1930,13 @@ export class DynamicWidgetView extends ItemView {
   }
 
   private renderApplyButton(
-    titleEl: HTMLElement,
+    liEl: HTMLElement,
     activeFile: TFile,
     area: string,
     applied: Set<string>,
   ): void {
     const isApplied = applied.has(area);
-    const applyEl = titleEl.createEl("button", {
+    const applyEl = liEl.createEl("button", {
       text: "\u2713",
       cls: isApplied
         ? "dw-area-suggestion-apply is-applied"
