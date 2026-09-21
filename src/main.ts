@@ -1,5 +1,6 @@
 import { MarkdownView, Plugin, type TFile } from 'obsidian';
 
+import { AreaTriageView, VIEW_TYPE_AREA_TRIAGE } from './area-triage-view';
 import { AreasView, VIEW_TYPE_AREAS } from './areas-view';
 import {
   DynamicWidgetView,
@@ -50,6 +51,12 @@ export default class DynamicWidgetPlugin extends Plugin {
       (leaf) => new AreasView(leaf, this)
     );
 
+    // Register the area triage view
+    this.registerView(
+      VIEW_TYPE_AREA_TRIAGE,
+      (leaf) => new AreaTriageView(leaf, this)
+    );
+
     // Register the someday maybe view
     this.registerView(
       VIEW_TYPE_SOMEDAY_MAYBE,
@@ -85,6 +92,15 @@ export default class DynamicWidgetPlugin extends Plugin {
       name: 'Open Areas',
       callback: () => {
         this.activateAreasView();
+      },
+    });
+
+    // Add command to open area triage view
+    this.addCommand({
+      id: 'open-area-triage-view',
+      name: 'Open Area Triage',
+      callback: () => {
+        this.activateAreaTriageView();
       },
     });
 
@@ -162,6 +178,14 @@ export default class DynamicWidgetPlugin extends Plugin {
       (leaf.view as AreasView).refreshContent();
     }
 
+    // Re-render area triage view
+    const triageLeaves = this.app.workspace.getLeavesOfType(
+      VIEW_TYPE_AREA_TRIAGE,
+    );
+    for (const leaf of triageLeaves) {
+      (leaf.view as AreaTriageView).refreshContent();
+    }
+
     // Re-render someday maybe view
     const somedayLeaves = this.app.workspace.getLeavesOfType(
       VIEW_TYPE_SOMEDAY_MAYBE,
@@ -203,6 +227,15 @@ export default class DynamicWidgetPlugin extends Plugin {
     const leaf = this.app.workspace.getLeaf('tab');
     await leaf.setViewState({
       type: VIEW_TYPE_AREAS,
+      active: true,
+    });
+    this.app.workspace.revealLeaf(leaf);
+  }
+
+  async activateAreaTriageView() {
+    const leaf = this.app.workspace.getLeaf('tab');
+    await leaf.setViewState({
+      type: VIEW_TYPE_AREA_TRIAGE,
       active: true,
     });
     this.app.workspace.revealLeaf(leaf);

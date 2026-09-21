@@ -689,3 +689,208 @@
   overflow: auto;
   font-size: var(--font-smallest);
 }
+
+.area-triage-content {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 20px 24px 40px;
+  max-width: 760px;
+  margin: 0 auto;
+  outline: none;
+}
+
+.area-triage-header {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.area-triage-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.area-triage-title {
+  font-size: var(--font-ui-large);
+  font-weight: 600;
+  line-height: 1;
+  margin-right: auto;
+}
+
+.area-triage-progress {
+  font-size: var(--font-smaller);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+}
+
+.area-triage-bar {
+  height: 3px;
+  border-radius: 3px;
+  background-color: var(--background-modifier-border);
+  overflow: hidden;
+}
+
+.area-triage-bar-fill {
+  height: 100%;
+  background-color: var(--interactive-accent);
+}
+
+/* Icon gutter, then the note's own block, then the status chip. A grid so the
+   chip cannot land on top of a long title the way an absolute one did. */
+.area-triage-note {
+  display: grid;
+  grid-template-columns: 1.6em 1fr auto;
+  column-gap: 10px;
+  align-items: start;
+  padding: 14px 16px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 8px;
+  background-color: var(--background-secondary);
+}
+
+.area-triage-note-icon,
+.area-triage-note-title {
+  font-size: var(--font-ui-medium);
+  line-height: 1.4;
+}
+
+.area-triage-note-main {
+  min-width: 0;
+}
+
+.area-triage-note-title {
+  display: block;
+  color: var(--text-normal);
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.area-triage-note-title:hover {
+  color: var(--text-accent);
+  text-decoration: underline;
+}
+
+.area-triage-note-path {
+  font-size: var(--font-smaller);
+  line-height: 1.4;
+  color: var(--text-muted);
+}
+
+.area-triage-note-description {
+  margin-top: 6px;
+  font-size: var(--font-smaller);
+  line-height: 1.4;
+  color: var(--text-muted);
+}
+
+.area-triage-status {
+  font-size: var(--font-smallest);
+  line-height: 1.6;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.area-triage-status.is-applied {
+  color: var(--color-green);
+}
+
+.area-triage-status.is-skipped {
+  color: var(--text-faint);
+}
+
+.area-triage-body {
+  min-height: 96px;
+}
+
+.area-triage-loading {
+  font-size: var(--font-smaller);
+  color: var(--text-muted);
+}
+
+.area-triage-choices {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+/* One line per area, every column in a fixed track: box, icon, name, lineage,
+   score, key. Single-line rows are what make the scores read as a column --
+   wrapping the lineage under the name would stagger them. */
+.area-triage-choice {
+  display: grid;
+  grid-template-columns: auto 1.5em auto 1fr 3.2em 1.4em;
+  align-items: center;
+  column-gap: 10px;
+  padding: 6px 10px;
+  border-radius: var(--radius-s);
+  cursor: pointer;
+}
+
+.area-triage-choice:hover,
+.area-triage-choice:focus-within {
+  background-color: var(--background-modifier-hover);
+}
+
+.area-triage-checkbox {
+  margin: 0;
+}
+
+.area-triage-choice-icon {
+  line-height: 1;
+  text-align: center;
+}
+
+.area-triage-choice-name {
+  color: var(--text-normal);
+  white-space: nowrap;
+}
+
+.area-triage-choice-lineage,
+.area-triage-key {
+  font-size: var(--font-smaller);
+  color: var(--text-faint);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The sidebar pins its score to the row's right edge absolutely; here the
+   grid already owns that column. */
+.area-triage-choice-score {
+  position: static;
+  transform: none;
+  text-align: right;
+}
+
+.area-triage-key {
+  text-align: right;
+}
+
+.area-triage-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.area-triage-hint {
+  width: 100%;
+  font-size: var(--font-smallest);
+  color: var(--text-faint);
+}
+
+.area-triage-choice-picked {
+  font-size: var(--font-smallest);
+  color: var(--text-faint);
+  text-align: right;
+}
+
+.area-triage-pick {
+  display: grid;
+  grid-template-columns: 1.5em auto 1fr;
+  align-items: center;
+  column-gap: 10px;
+}

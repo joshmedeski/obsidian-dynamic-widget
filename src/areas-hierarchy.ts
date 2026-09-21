@@ -98,3 +98,38 @@ export function collectAreaNames(node: AreaNode): string[] {
   }
   return names;
 }
+
+export function getAllAreaFiles(app: App): TFile[] {
+  return app.vault
+    .getFiles()
+    .filter(
+      (f) =>
+        f.path.startsWith("Areas/") &&
+        f.extension === "md" &&
+        f.path.split("/").length === 2,
+    )
+    .sort((a, b) => a.basename.localeCompare(b.basename));
+}
+
+/** Parent chain of an area, nearest parent first. */
+export function getAreaAncestors(app: App, areaName: string): string[] {
+  const byName = new Map(getAllAreaFiles(app).map((f) => [f.basename, f]));
+  const chain: string[] = [];
+  const seen = new Set<string>([areaName]);
+  let current = areaName;
+
+  for (;;) {
+    const file = byName.get(current);
+    if (!file) break;
+    const raw = app.metadataCache.getFileCache(file)?.frontmatter?.areas;
+    if (!raw) break;
+    const parent = normalizeAreasFrontmatter(raw).map(simplifyWikiLink)[0];
+    // A cycle in the frontmatter would otherwise spin here forever.
+    if (!parent || seen.has(parent)) break;
+    chain.push(parent);
+    seen.add(parent);
+    current = parent;
+  }
+
+  return chain;
+}
