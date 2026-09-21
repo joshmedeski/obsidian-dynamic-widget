@@ -1,5 +1,6 @@
 import { MarkdownView, Plugin, type TFile } from 'obsidian';
 
+import { AreaTableView, VIEW_TYPE_AREA_TABLE } from './area-table-view';
 import { AreaTriageView, VIEW_TYPE_AREA_TRIAGE } from './area-triage-view';
 import { AreasView, VIEW_TYPE_AREAS } from './areas-view';
 import {
@@ -57,6 +58,12 @@ export default class DynamicWidgetPlugin extends Plugin {
       (leaf) => new AreaTriageView(leaf, this)
     );
 
+    // Register the area table view
+    this.registerView(
+      VIEW_TYPE_AREA_TABLE,
+      (leaf) => new AreaTableView(leaf, this)
+    );
+
     // Register the someday maybe view
     this.registerView(
       VIEW_TYPE_SOMEDAY_MAYBE,
@@ -101,6 +108,15 @@ export default class DynamicWidgetPlugin extends Plugin {
       name: 'Open Area Triage',
       callback: () => {
         this.activateAreaTriageView();
+      },
+    });
+
+    // Add command to open area table view
+    this.addCommand({
+      id: 'open-area-table-view',
+      name: 'Open Area Table',
+      callback: () => {
+        this.activateAreaTableView();
       },
     });
 
@@ -186,6 +202,14 @@ export default class DynamicWidgetPlugin extends Plugin {
       (leaf.view as AreaTriageView).refreshContent();
     }
 
+    // Re-render area table view
+    const tableLeaves = this.app.workspace.getLeavesOfType(
+      VIEW_TYPE_AREA_TABLE,
+    );
+    for (const leaf of tableLeaves) {
+      (leaf.view as AreaTableView).refreshContent();
+    }
+
     // Re-render someday maybe view
     const somedayLeaves = this.app.workspace.getLeavesOfType(
       VIEW_TYPE_SOMEDAY_MAYBE,
@@ -236,6 +260,15 @@ export default class DynamicWidgetPlugin extends Plugin {
     const leaf = this.app.workspace.getLeaf('tab');
     await leaf.setViewState({
       type: VIEW_TYPE_AREA_TRIAGE,
+      active: true,
+    });
+    this.app.workspace.revealLeaf(leaf);
+  }
+
+  async activateAreaTableView() {
+    const leaf = this.app.workspace.getLeaf('tab');
+    await leaf.setViewState({
+      type: VIEW_TYPE_AREA_TABLE,
       active: true,
     });
     this.app.workspace.revealLeaf(leaf);

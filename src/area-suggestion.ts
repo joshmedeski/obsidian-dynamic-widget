@@ -45,6 +45,8 @@ export function confidenceOf(score: number): Confidence {
 
 const ENGINE_PROJECT = join(homedir(), "c", "decision-engine");
 const TIMEOUT_MS = 20000;
+const VAULT_TIMEOUT_MS = 300000;
+const VAULT_MAX_BUFFER = 64 * 1024 * 1024;
 
 // Obsidian launched from Finder inherits a minimal PATH that misses Homebrew
 // and the uv installer's own bin dir, so resolve the binary before spawning.
@@ -69,22 +71,9 @@ export async function suggestAreas(
   app: App,
   file: TFile,
 ): Promise<AreaSuggestion> {
-  const adapter = app.vault.adapter;
-  if (!(adapter instanceof FileSystemAdapter)) {
-    throw new Error("Area suggestions need a local vault");
-  }
-  const vaultPath = adapter.getBasePath();
+  const vaultPath = basePath(app);
 
-  const stdout = await run(resolveUv(), [
-    "run",
-    "--project",
-    ENGINE_PROJECT,
-    "classify-note",
-    join(vaultPath, file.path),
-    "--json",
-    "--vault",
-    vaultPath,
-  ]);
+  const stdout = await run(resolveUv(), classifyArgs(join(vaultPath, file.path), vaultPath));
 
   const parsed = JSON.parse(stdout) as AreaSuggestion;
   if (!Array.isArray(parsed.choices)) {
@@ -93,12 +82,57 @@ export async function suggestAreas(
   return parsed;
 }
 
-function run(command: string, args: string[]): Promise<string> {
+/**
+ * Every note in the vault in one subprocess. The CLI emits one JSON object per
+ * line when handed a directory, and the whole vault takes a couple of seconds
+ * -- cheaper than 3000 spawns, so there is no per-note caching here.
+ */
+export async function classifyVault(app: App): Promise<AreaSuggestion[]> {
+  const vaultPath = basePath(app);
+
+  const stdout = await run(resolveUv(), classifyArgs(vaultPath, vaultPath), {
+    timeout: VAULT_TIMEOUT_MS,
+    maxBuffer: VAULT_MAX_BUFFER,
+  });
+
+  return stdout
+    .split("\n")
+    .filter((line) => line.trim() !== "")
+    .map((line) => JSON.parse(line) as AreaSuggestion)
+    .filter((entry) => Array.isArray(entry.choices));
+}
+
+function classifyArgs(target: string, vaultPath: string): string[] {
+  return [
+    "run",
+    "--project",
+    ENGINE_PROJECT,
+    "classify-note",
+    target,
+    "--json",
+    "--vault",
+    vaultPath,
+  ];
+}
+
+export function basePath(app: App): string {
+  const adapter = app.vault.adapter;
+  if (!(adapter instanceof FileSystemAdapter)) {
+    throw new Error("Area suggestions need a local vault");
+  }
+  return adapter.getBasePath();
+}
+
+function run(
+  command: string,
+  args: string[],
+  options: { timeout?: number; maxBuffer?: number } = {},
+): Promise<string> {
   return new Promise((resolve, reject) => {
     execFile(
       command,
       args,
-      { timeout: TIMEOUT_MS, encoding: "utf8" },
+      { timeout: TIMEOUT_MS, encoding: "utf8", ...options },
       (error, stdout, stderr) => {
         if (error) {
           const detail = stderr.trim() || error.message;

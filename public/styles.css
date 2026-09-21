@@ -894,3 +894,127 @@
   align-items: center;
   column-gap: 10px;
 }
+
+.area-table-content {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px 24px 40px;
+  overflow-x: auto;
+}
+
+.area-table-header {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  position: sticky;
+  left: 0;
+}
+
+.area-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--font-smaller);
+}
+
+.area-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  text-align: left;
+  padding: 0;
+  background-color: var(--background-primary);
+  border-bottom: 1px solid var(--background-modifier-border);
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.area-table-sort {
+  all: unset;
+  cursor: pointer;
+  display: block;
+  width: 100%;
+  padding: 6px 8px;
+  color: inherit;
+}
+
+.area-table-sort:hover {
+  color: var(--text-normal);
+}
+
+.area-table-sort.is-active {
+  color: var(--text-normal);
+  font-weight: 600;
+}
+
+.area-table-sort-arrow {
+  color: var(--text-faint);
+}
+
+.area-table td {
+  padding: 6px 8px;
+  vertical-align: top;
+  border-bottom: 1px solid var(--background-modifier-border-hover);
+}
+
+.area-table-row:hover {
+  background-color: var(--background-modifier-hover);
+}
+
+.area-table-col-note {
+  min-width: 260px;
+}
+
+.area-table-icon {
+  margin-right: 6px;
+}
+
+.area-table-note-title {
+  color: var(--text-normal);
+  cursor: pointer;
+}
+
+.area-table-note-title:hover {
+  color: var(--text-accent);
+  text-decoration: underline;
+}
+
+.area-table-col-folder,
+.area-table-col-strategy {
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+/* The sidebar pins its score absolutely; a table cell already owns its box. */
+.area-table .dw-area-suggestion-score {
+  position: static;
+  transform: none;
+  font-size: inherit;
+}
+
+.area-table-col-score {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.area-table-col-areas,
+.area-table-col-existing {
+  min-width: 200px;
+}
+
+.area-table-chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  margin: 0 6px 2px 0;
+  white-space: nowrap;
+}
+
+.area-table-chip-score {
+  font-variant-numeric: tabular-nums;
+}
+
+.area-table-empty {
+  color: var(--text-faint);
+}
