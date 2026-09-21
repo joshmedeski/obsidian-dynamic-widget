@@ -68,6 +68,14 @@ only renders it. Consequences:
 - **`uv` and the `decision-engine` checkout are required** for the section to
   work. Without them the section renders the stderr from the failed spawn
   instead of results — the rest of the widget is unaffected.
+- It runs **only for a note with no `areas:` prop**. `determineActiveFileType`
+  already routes a note that has one to `renderAreasContent`, but
+  `renderAreaSuggestions` re-checks with `hasAreas` and bails, and checks again
+  after the subprocess resolves in case the prop appeared mid-classify. Note
+  that `areas: []` counts as *having* the prop, so it gets no suggestion.
+- Each suggestion has a ✓ that writes the area into frontmatter via
+  `processFrontMatter`. Applying one makes the note type `areas`, so the section
+  removes itself on the next render.
 - The classifier runs **only when the button is clicked**, never on note open.
   `updateContent` fires on every `active-leaf-change` and metadata change, so
   spawning there would mean a process per keystroke.

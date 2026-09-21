@@ -644,3 +644,22 @@
   overflow: auto;
   font-size: var(--font-smallest);
 }
+
+.dw-area-suggestion-apply {
+  font-size: var(--font-smallest);
+  line-height: 1;
+  padding: 2px 6px;
+  margin-left: 6px;
+  cursor: pointer;
+  opacity: 0;
+}
+
+.dw-list-item:hover .dw-area-suggestion-apply,
+.dw-area-suggestion-apply:focus-visible {
+  opacity: 1;
+}
+
+.dw-area-suggestion-apply:disabled {
+  cursor: default;
+  opacity: 0.4;
+}

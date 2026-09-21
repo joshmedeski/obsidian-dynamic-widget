@@ -1,6 +1,10 @@
-import { type App, ItemView, TFile, type WorkspaceLeaf } from "obsidian";
+import { type App, ItemView, Notice, TFile, type WorkspaceLeaf } from "obsidian";
 import { collectAreaNames, getAreaHierarchy } from "./areas-hierarchy";
-import { type AreaSuggestion, suggestAreas } from "./area-suggestion";
+import {
+  type AreaSuggestion,
+  hasAreas,
+  suggestAreas,
+} from "./area-suggestion";
 import { type CalendarEvent, fetchEventsForDate } from "./calendar";
 import type DynamicWidgetPlugin from "./main";
 import {
@@ -1777,6 +1781,9 @@ export class DynamicWidgetView extends ItemView {
   }
 
   private renderAreaSuggestions(activeFile: TFile): void {
+    if (hasAreas(this.app, activeFile)) {
+      return;
+    }
     if (this.plugin.privateMode && isFilePrivate(this.app, activeFile)) {
       return;
     }
@@ -1808,6 +1815,10 @@ export class DynamicWidgetView extends ItemView {
         if (this.app.workspace.getActiveFile()?.path !== activeFile.path) {
           return;
         }
+        if (hasAreas(this.app, activeFile)) {
+          sectionEl.remove();
+          return;
+        }
         bodyEl.empty();
         this.renderSuggestionResult(bodyEl, activeFile, result);
       } catch (error) {
@@ -1817,6 +1828,19 @@ export class DynamicWidgetView extends ItemView {
           cls: "dw-area-suggestion-error",
         });
       }
+    });
+  }
+
+  private async applyArea(file: TFile, area: string): Promise<void> {
+    await this.app.fileManager.processFrontMatter(file, (frontmatter) => {
+      const existing = frontmatter.areas
+        ? normalizeAreasFrontmatter(frontmatter.areas)
+        : [];
+      const names = existing.map(simplifyWikiLink);
+      if (!names.includes(area)) {
+        existing.push(`[[${area}]]`);
+      }
+      frontmatter.areas = existing;
     });
   }
 
@@ -1857,6 +1881,24 @@ export class DynamicWidgetView extends ItemView {
         liEl.createEl("span", {
           text: choice.score.toFixed(2),
           cls: "dw-area-suggestion-score",
+        });
+
+        const applyEl = liEl.createEl("button", {
+          text: "✓",
+          cls: "dw-area-suggestion-apply",
+          attr: { "aria-label": `Set areas to ${choice.area}` },
+        });
+        applyEl.addEventListener("click", async () => {
+          applyEl.disabled = true;
+          try {
+            await this.applyArea(activeFile, choice.area);
+            new Notice(`areas: [[${choice.area}]]`);
+          } catch (error) {
+            applyEl.disabled = false;
+            new Notice(
+              error instanceof Error ? error.message : String(error),
+            );
+          }
         });
 
         const trail = choice.lineage.join(" ‹ ");
