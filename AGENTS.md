@@ -81,10 +81,15 @@ put `renderMedia` back inside the per-type renderers. Consequences:
   there's a cached result, whatever the note's type became. `areas: []` counts
   as *having* the prop, so it never triggers a classify.
 - The classifier runs **only when the button is clicked**, never on note open.
-- Each suggestion has a ✓ that merges the area into frontmatter via
-  `processFrontMatter`. Areas already present render their ✓ inert and
-  accented, so the list shows what's been taken. The click stops propagation —
-  the row itself opens the area note.
+- **Clicking a row files the note under that area** via `processFrontMatter`;
+  it does not navigate to the area note. Rows for areas already in the
+  frontmatter are inert and carry a ✓.
+- The score is colour-coded by confidence, and the bands are measured rather
+  than chosen: `evals/calibrate.py` in the decision-engine repo buckets every
+  prediction over the gold set by score and reports how often it was right.
+  Under 0.75 was right 19% of the time, 0.75–1.50 37%, 1.50+ 53%, which is
+  where `CONFIDENCE_MEDIUM` and `CONFIDENCE_HIGH` come from. Re-run it before
+  changing either number, or after changing the strategy.
 - The cache is keyed by **path alone, not `path:mtime`**. Applying an area
   rewrites frontmatter and bumps mtime, which would otherwise discard the very
   list the user is working through.

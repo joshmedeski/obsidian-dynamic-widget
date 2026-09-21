@@ -21,6 +21,28 @@ export interface AreaSuggestion {
   choices: AreaChoice[];
 }
 
+/**
+ * Score bands measured against the classifier's own gold set
+ * (`evals/calibrate.py` in the decision-engine repo, 665 predicted choices).
+ * Share of predictions whose area was literally in the note's own `areas:`
+ *
+ *   0.15-0.75   62% of choices   19% correct
+ *   0.75-1.50   25% of choices   37% correct
+ *   1.50+       13% of choices   53% correct
+ *
+ * The engine abstains below 0.15, so that is the floor rather than zero.
+ */
+const CONFIDENCE_HIGH = 1.5;
+const CONFIDENCE_MEDIUM = 0.75;
+
+export type Confidence = "low" | "medium" | "high";
+
+export function confidenceOf(score: number): Confidence {
+  if (score >= CONFIDENCE_HIGH) return "high";
+  if (score >= CONFIDENCE_MEDIUM) return "medium";
+  return "low";
+}
+
 const ENGINE_PROJECT = join(homedir(), "c", "decision-engine");
 const TIMEOUT_MS = 20000;
 

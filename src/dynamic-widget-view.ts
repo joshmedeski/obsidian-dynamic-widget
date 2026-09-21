@@ -2,6 +2,7 @@ import { type App, ItemView, Notice, TFile, type WorkspaceLeaf } from "obsidian"
 import { collectAreaNames, getAreaHierarchy } from "./areas-hierarchy";
 import {
   type AreaSuggestion,
+  confidenceOf,
   hasAreas,
   suggestAreas,
 } from "./area-suggestion";
@@ -931,8 +932,9 @@ export class DynamicWidgetView extends ItemView {
    * Shared by calendar event rows and area suggestions so both inherit the
    * same gutter, hover and focus behaviour from `.dw-list-item.is-row`.
    *
-   * Returns the row and its title element; callers append their own inline
-   * trailing content (scores, buttons) to the title.
+   * Callers add their own trailing content as a sibling of the title, never a
+   * child: an inline-block inside the title sits on its baseline and drags the
+   * text out of line with the absolutely positioned bullet.
    */
   private makeIconRow(
     ulEl: Element,
@@ -943,7 +945,7 @@ export class DynamicWidgetView extends ItemView {
       descriptionCls?: string;
       isActive?: boolean;
       isPrivate?: boolean;
-      onOpen?: () => void;
+      onActivate?: () => void;
     },
   ): { liEl: HTMLElement; titleEl: HTMLElement } {
     const isActive = options.isActive ?? false;
@@ -969,17 +971,17 @@ export class DynamicWidgetView extends ItemView {
       });
     }
 
-    const onOpen = options.onOpen;
-    if (!isActive && onOpen) {
-      const open = (event: Event): void => {
+    const onActivate = options.onActivate;
+    if (!isActive && onActivate) {
+      const activate = (event: Event): void => {
         event.preventDefault();
-        onOpen();
+        onActivate();
       };
       liEl.setAttribute("role", "button");
       liEl.setAttribute("tabindex", "0");
-      liEl.addEventListener("click", open);
+      liEl.addEventListener("click", activate);
       liEl.addEventListener("keydown", (event) => {
-        if (event.key === "Enter" || event.key === " ") open(event);
+        if (event.key === "Enter" || event.key === " ") activate(event);
       });
     }
 
@@ -1010,7 +1012,7 @@ export class DynamicWidgetView extends ItemView {
         isPrivate: Boolean(
           this.plugin.privateMode && isFilePrivate(this.app, file),
         ),
-        onOpen: () => {
+        onActivate: () => {
           this.app.workspace.getLeaf("tab").openFile(file);
         },
       });
@@ -1892,31 +1894,33 @@ export class DynamicWidgetView extends ItemView {
       for (const choice of result.choices) {
         // The area names its own lineage tail; showing it again says nothing.
         const lineage = choice.lineage.filter((name) => name !== choice.area);
-        const areaFile = this.app.metadataCache.getFirstLinkpathDest(
-          choice.area,
-          activeFile.path,
-        );
+        const isApplied = applied.has(choice.area);
 
-        const { liEl } = this.makeIconRow(ulEl, {
+        const { liEl, titleEl } = this.makeIconRow(ulEl, {
           bullet: areaIcon(this.app, choice.area) ?? DEFAULT_BULLET,
           title: choice.area,
           description: lineage.length > 0 ? lineage.join(" \u2039 ") : undefined,
-          onOpen: areaFile
-            ? () => {
-                this.app.workspace.getLeaf("tab").openFile(areaFile);
-              }
-            : undefined,
+          onActivate: isApplied
+            ? undefined
+            : () => {
+                void this.applyAreaFromRow(activeFile, choice.area);
+              },
         });
 
-        // Both are siblings of the title, not children: an inline-block button
-        // inside it sits on the text baseline and drags the title down out of
-        // line with the absolutely positioned icon.
+        if (isApplied) {
+          liEl.classList.add("is-applied");
+          titleEl.createEl("span", {
+            text: "\u2713",
+            cls: "dw-area-suggestion-check",
+          });
+        }
+
+        // Absolutely positioned, so it does not matter that the description
+        // was appended before it.
         liEl.createEl("span", {
           text: choice.score.toFixed(2),
-          cls: "dw-area-suggestion-score",
+          cls: `dw-area-suggestion-score is-${confidenceOf(choice.score)}`,
         });
-
-        this.renderApplyButton(liEl, activeFile, choice.area, applied);
       }
     }
 
@@ -1929,41 +1933,13 @@ export class DynamicWidgetView extends ItemView {
     });
   }
 
-  private renderApplyButton(
-    liEl: HTMLElement,
-    activeFile: TFile,
-    area: string,
-    applied: Set<string>,
-  ): void {
-    const isApplied = applied.has(area);
-    const applyEl = liEl.createEl("button", {
-      text: "\u2713",
-      cls: isApplied
-        ? "dw-area-suggestion-apply is-applied"
-        : "dw-area-suggestion-apply",
-      attr: {
-        "aria-label": isApplied ? `${area} already added` : `Add ${area} to areas`,
-      },
-    });
-
-    if (isApplied) {
-      applyEl.disabled = true;
-      return;
+  private async applyAreaFromRow(file: TFile, area: string): Promise<void> {
+    try {
+      await this.applyArea(file, area);
+      new Notice(`Added [[${area}]]`);
+    } catch (error) {
+      new Notice(error instanceof Error ? error.message : String(error));
     }
-
-    applyEl.addEventListener("click", async (event) => {
-      // The whole row opens the area note; applying must not also navigate.
-      event.preventDefault();
-      event.stopPropagation();
-      applyEl.disabled = true;
-      try {
-        await this.applyArea(activeFile, area);
-        new Notice(`Added [[${area}]]`);
-      } catch (error) {
-        applyEl.disabled = false;
-        new Notice(error instanceof Error ? error.message : String(error));
-      }
-    });
   }
 
   private updateContent() {

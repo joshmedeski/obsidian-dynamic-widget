@@ -612,18 +612,56 @@
   opacity: 0.6;
 }
 
-/* Sibling of the title rather than a child, so row hover does not underline
-   it along with the title text. */
-.dw-area-suggestion-score {
-  font-size: var(--font-smaller);
-  color: var(--text-faint);
-  font-variant-numeric: tabular-nums;
-  margin-left: 0.4em;
+/* Clicking a row files the note under that area -- it does not navigate, so
+   the title drops the link underline the shared primitive gives it. Room on
+   the right is reserved for the score. */
+.dw-area-suggestion .dw-list-item {
+  padding-right: 3.2em;
 }
 
-/* Keeps a long area name from running under the apply button. */
-.dw-area-suggestion .dw-list-item {
-  padding-right: 2.4em;
+.dw-area-suggestion .dw-list-item:hover .dw-list-title,
+.dw-area-suggestion .dw-list-item:focus-visible .dw-list-title {
+  text-decoration: none;
+}
+
+.dw-area-suggestion .dw-list-item.is-applied {
+  cursor: default;
+}
+
+.dw-area-suggestion .dw-list-item.is-applied:hover {
+  background: transparent;
+}
+
+.dw-area-suggestion-check {
+  margin-left: 0.4em;
+  color: var(--color-green);
+}
+
+/* Confidence, measured against the classifier's gold set: a score under 0.75
+   was right 19% of the time, 0.75-1.50 37%, and 1.50+ 53%. The colour is the
+   only honest signal of how much weight to put on a row, so it carries the
+   number rather than sitting beside it. */
+.dw-area-suggestion-score {
+  position: absolute;
+  right: var(--dw-row-inset-x);
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: var(--font-ui-medium);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.dw-area-suggestion-score.is-high {
+  color: var(--color-green);
+}
+
+.dw-area-suggestion-score.is-medium {
+  color: var(--color-yellow);
+}
+
+.dw-area-suggestion-score.is-low {
+  color: var(--text-faint);
 }
 
 .dw-area-suggestion-abstained,
@@ -650,31 +688,4 @@
   max-height: 260px;
   overflow: auto;
   font-size: var(--font-smallest);
-}
-
-/* Revealed on row hover so the list stays quiet until acted on. An area
-   already in the note's frontmatter stays visible and inert instead, marking
-   what has been taken while the rest of the list remains usable. */
-.dw-area-suggestion-apply {
-  position: absolute;
-  right: var(--dw-row-inset-x);
-  top: var(--dw-row-inset-y);
-  font-size: var(--font-smallest);
-  line-height: 1;
-  padding: 2px 6px;
-  cursor: pointer;
-  opacity: 0;
-}
-
-.dw-list-item:hover .dw-area-suggestion-apply,
-.dw-area-suggestion-apply:focus-visible {
-  opacity: 1;
-}
-
-.dw-area-suggestion-apply.is-applied {
-  opacity: 1;
-  cursor: default;
-  color: var(--text-accent);
-  background: transparent;
-  box-shadow: none;
 }
