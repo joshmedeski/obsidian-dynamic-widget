@@ -63,20 +63,28 @@ uv run --project ~/c/decision-engine classify-note <abs note path> --json --vaul
 ```
 
 `src/area-suggestion.ts` owns the subprocess and parses that JSON; the widget
-only renders it. Consequences:
+only renders it, through the shared `makeIconRow` (icon gutter + title +
+optional description) that calendar event rows also use. `updateContent` calls
+`renderMedia` and then `renderAreaSuggestions` ahead of the type switch, so
+cover art and suggestions are pinned to the top for every note type — do not
+put `renderMedia` back inside the per-type renderers. Consequences:
 
 - **`uv` and the `decision-engine` checkout are required** for the section to
   work. Without them the section renders the stderr from the failed spawn
   instead of results — the rest of the widget is unaffected.
-- It runs **only for a note with no `areas:` prop**. `determineActiveFileType`
-  already routes a note that has one to `renderAreasContent`, but
-  `renderAreaSuggestions` re-checks with `hasAreas` and bails, and checks again
-  after the subprocess resolves in case the prop appeared mid-classify. Note
-  that `areas: []` counts as *having* the prop, so it gets no suggestion.
-- Each suggestion has a ✓ that writes the area into frontmatter via
-  `processFrontMatter`. Applying one makes the note type `areas`, so the section
-  removes itself on the next render.
+- **Classifying is gated on the note having no `areas:` prop** (`hasAreas`);
+  *displaying* a result is not. Once computed, the list stays up after an area
+  is applied so more can be added from it — the section renders whenever
+  there's a cached result, whatever the note's type became. `areas: []` counts
+  as *having* the prop, so it never triggers a classify.
 - The classifier runs **only when the button is clicked**, never on note open.
+- Each suggestion has a ✓ that merges the area into frontmatter via
+  `processFrontMatter`. Areas already present render their ✓ inert and
+  accented, so the list shows what's been taken. The click stops propagation —
+  the row itself opens the area note.
+- The cache is keyed by **path alone, not `path:mtime`**. Applying an area
+  rewrites frontmatter and bumps mtime, which would otherwise discard the very
+  list the user is working through.
   `updateContent` fires on every `active-leaf-change` and metadata change, so
   spawning there would mean a process per keystroke.
 - Results are cached per `path:mtime` for the life of the view, so switching

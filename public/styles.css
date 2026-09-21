@@ -645,6 +645,9 @@
   font-size: var(--font-smallest);
 }
 
+/* Revealed on row hover so the list stays quiet until acted on. An area
+   already in the note's frontmatter stays visible and inert instead, marking
+   what has been taken while the rest of the list remains usable. */
 .dw-area-suggestion-apply {
   font-size: var(--font-smallest);
   line-height: 1;
@@ -659,7 +662,10 @@
   opacity: 1;
 }
 
-.dw-area-suggestion-apply:disabled {
+.dw-area-suggestion-apply.is-applied {
+  opacity: 1;
   cursor: default;
-  opacity: 0.4;
+  color: var(--text-accent);
+  background: transparent;
+  box-shadow: none;
 }

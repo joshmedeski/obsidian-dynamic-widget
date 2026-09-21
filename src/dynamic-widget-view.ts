@@ -926,6 +926,66 @@ export class DynamicWidgetView extends ItemView {
     return sectionEl;
   }
 
+  /**
+   * A list row laid out as icon gutter + title + optional description line.
+   * Shared by calendar event rows and area suggestions so both inherit the
+   * same gutter, hover and focus behaviour from `.dw-list-item.is-row`.
+   *
+   * Returns the row and its title element; callers append their own inline
+   * trailing content (scores, buttons) to the title.
+   */
+  private makeIconRow(
+    ulEl: Element,
+    options: {
+      bullet: string;
+      title: string;
+      description?: string;
+      descriptionCls?: string;
+      isActive?: boolean;
+      isPrivate?: boolean;
+      onOpen?: () => void;
+    },
+  ): { liEl: HTMLElement; titleEl: HTMLElement } {
+    const isActive = options.isActive ?? false;
+    const isPrivate = options.isPrivate ?? false;
+
+    const liEl = ulEl.createEl("li", { cls: "dw-list-item is-row" });
+    liEl.style.setProperty("--emoji-bullet", `"${options.bullet}"`);
+
+    const titleEl = liEl.createEl(isActive ? "span" : "div", {
+      text: isPrivate ? redactText(options.title) : options.title,
+      cls: isActive ? "dynamic-widget-active-file" : "dw-list-title",
+    });
+    if (isPrivate) {
+      titleEl.classList.add("dynamic-widget-private");
+    }
+
+    if (options.description) {
+      liEl.createEl("div", {
+        text: options.description,
+        cls: options.descriptionCls
+          ? `dw-list-meta ${options.descriptionCls}`
+          : "dw-list-meta",
+      });
+    }
+
+    const onOpen = options.onOpen;
+    if (!isActive && onOpen) {
+      const open = (event: Event): void => {
+        event.preventDefault();
+        onOpen();
+      };
+      liEl.setAttribute("role", "button");
+      liEl.setAttribute("tabindex", "0");
+      liEl.addEventListener("click", open);
+      liEl.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" || event.key === " ") open(event);
+      });
+    }
+
+    return { liEl, titleEl };
+  }
+
   private makeEventNoteRows(
     entries: { file: TFile; date: Date; hasTime: boolean }[],
   ): Element {
@@ -934,47 +994,25 @@ export class DynamicWidgetView extends ItemView {
     ulEl.classList.add("dw-list");
 
     for (const { file, date, hasTime } of entries) {
-      const liEl = ulEl.createEl("li", { cls: "dw-list-item is-row" });
       const meta = this.app.metadataCache.getFileCache(file);
-      const isPrivate = Boolean(
-        this.plugin.privateMode && isFilePrivate(this.app, file),
-      );
 
       // The filename carries the date for uniqueness; the row already shows it.
       const label = stripEventDateSuffix(
         meta?.frontmatter?.title || file.basename,
       );
 
-      liEl.style.setProperty(
-        "--emoji-bullet",
-        `"${noteBullet(this.app, file, DEFAULT_EVENT_BULLET)}"`,
-      );
-
-      const isActive = activeFile?.path === file.path;
-      const titleEl = liEl.createEl(isActive ? "span" : "div", {
-        text: isPrivate ? redactText(label) : label,
-        cls: isActive ? "dynamic-widget-active-file" : "dw-list-title",
-      });
-      if (isPrivate) {
-        titleEl.classList.add("dynamic-widget-private");
-      }
-
-      liEl.createEl("div", {
-        text: formatEventNoteWhen(date, hasTime),
-        cls: "dw-list-meta calendar-event-meta",
-      });
-
-      if (isActive) continue;
-
-      const open = (event: Event): void => {
-        event.preventDefault();
-        this.app.workspace.getLeaf("tab").openFile(file);
-      };
-      liEl.setAttribute("role", "button");
-      liEl.setAttribute("tabindex", "0");
-      liEl.addEventListener("click", open);
-      liEl.addEventListener("keydown", (event) => {
-        if (event.key === "Enter" || event.key === " ") open(event);
+      this.makeIconRow(ulEl, {
+        bullet: noteBullet(this.app, file, DEFAULT_EVENT_BULLET),
+        title: label,
+        description: formatEventNoteWhen(date, hasTime),
+        descriptionCls: "calendar-event-meta",
+        isActive: activeFile?.path === file.path,
+        isPrivate: Boolean(
+          this.plugin.privateMode && isFilePrivate(this.app, file),
+        ),
+        onOpen: () => {
+          this.app.workspace.getLeaf("tab").openFile(file);
+        },
       });
     }
     return ulEl;
@@ -1291,11 +1329,6 @@ export class DynamicWidgetView extends ItemView {
   private renderAreaContent(activeFile: TFile): void {
     const metadata = this.app.metadataCache.getFileCache(activeFile);
 
-    this.renderMedia({
-      cover: metadata?.frontmatter?.cover,
-      activeFilePath: activeFile.path,
-    });
-
     let areas: string[] = [];
 
     if (activeFile.path.startsWith("Areas/")) {
@@ -1360,11 +1393,6 @@ export class DynamicWidgetView extends ItemView {
   private renderAreasContent(activeFile: TFile): void {
     const metadata = this.app.metadataCache.getFileCache(activeFile);
 
-    this.renderMedia({
-      cover: metadata?.frontmatter?.cover,
-      activeFilePath: activeFile.path,
-    });
-
     let areas: string[] = [];
 
     if (activeFile.path.startsWith("Areas/")) {
@@ -1412,11 +1440,6 @@ export class DynamicWidgetView extends ItemView {
 
   private renderRelationshipContent(activeFile: TFile): void {
     const metadata = this.app.metadataCache.getFileCache(activeFile);
-
-    this.renderMedia({
-      cover: metadata?.frontmatter?.cover,
-      activeFilePath: activeFile.path,
-    });
 
     const resolved = this.app.metadataCache.resolvedLinks;
     const backlinks: TFile[] = [];
@@ -1780,22 +1803,28 @@ export class DynamicWidgetView extends ItemView {
     this.contentEl.appendChild(sectionEl);
   }
 
+  /**
+   * Ranked areas from the vault-areas classifier, rendered directly under the
+   * cover image. Classifying is gated on the note having no `areas:` prop, but
+   * a result already computed stays on screen after one is applied so further
+   * areas can be added from the same list.
+   */
   private renderAreaSuggestions(activeFile: TFile): void {
-    if (hasAreas(this.app, activeFile)) {
+    if (this.plugin.privateMode && isFilePrivate(this.app, activeFile)) {
       return;
     }
-    if (this.plugin.privateMode && isFilePrivate(this.app, activeFile)) {
+
+    const cached = this.suggestionCache.get(activeFile.path);
+    const classifiable = !hasAreas(this.app, activeFile);
+    if (!cached && !classifiable) {
       return;
     }
 
     const sectionEl = this.contentEl.createEl("section", {
       cls: "dw-area-suggestion",
     });
-    sectionEl.createEl("h3", { text: "🧭 Suggested Areas" });
-
-    const cacheKey = `${activeFile.path}:${activeFile.stat.mtime}`;
+    sectionEl.createEl("h3", { text: "\u{1F9ED} Suggested Areas" });
     const bodyEl = sectionEl.createEl("div");
-    const cached = this.suggestionCache.get(cacheKey);
 
     if (cached) {
       this.renderSuggestionResult(bodyEl, activeFile, cached);
@@ -1808,15 +1837,11 @@ export class DynamicWidgetView extends ItemView {
     });
     buttonEl.addEventListener("click", async () => {
       buttonEl.disabled = true;
-      buttonEl.setText("Classifying…");
+      buttonEl.setText("Classifying\u2026");
       try {
         const result = await suggestAreas(this.app, activeFile);
-        this.suggestionCache.set(cacheKey, result);
+        this.suggestionCache.set(activeFile.path, result);
         if (this.app.workspace.getActiveFile()?.path !== activeFile.path) {
-          return;
-        }
-        if (hasAreas(this.app, activeFile)) {
-          sectionEl.remove();
           return;
         }
         bodyEl.empty();
@@ -1829,6 +1854,12 @@ export class DynamicWidgetView extends ItemView {
         });
       }
     });
+  }
+
+  private appliedAreas(file: TFile): Set<string> {
+    const raw = this.app.metadataCache.getFileCache(file)?.frontmatter?.areas;
+    if (!raw) return new Set();
+    return new Set(normalizeAreasFrontmatter(raw).map(simplifyWikiLink));
   }
 
   private async applyArea(file: TFile, area: string): Promise<void> {
@@ -1851,61 +1882,38 @@ export class DynamicWidgetView extends ItemView {
   ): void {
     if (result.abstained) {
       bodyEl.createEl("div", {
-        text: `No confident match — falls back to ${result.areas.join(" ")}`,
+        text: `No confident match \u2014 falls back to ${result.areas.join(" ")}`,
         cls: "dw-area-suggestion-abstained",
       });
     } else {
+      const applied = this.appliedAreas(activeFile);
       const ulEl = bodyEl.createEl("ul", { cls: "dw-list" });
-      for (const choice of result.choices) {
-        const liEl = ulEl.createEl("li", { cls: "dw-list-item" });
-        liEl.style.setProperty(
-          "--emoji-bullet",
-          `"${areaIcon(this.app, choice.area) ?? DEFAULT_BULLET}"`,
-        );
 
-        const linkEl = liEl.createEl("a", {
-          text: choice.area,
-          cls: "dw-list-title",
-        });
+      for (const choice of result.choices) {
+        // The area names its own lineage tail; showing it again says nothing.
+        const lineage = choice.lineage.filter((name) => name !== choice.area);
         const areaFile = this.app.metadataCache.getFirstLinkpathDest(
           choice.area,
           activeFile.path,
         );
-        if (areaFile) {
-          linkEl.addEventListener("click", (event) => {
-            event.preventDefault();
-            this.app.workspace.getLeaf("tab").openFile(areaFile);
-          });
-        }
 
-        liEl.createEl("span", {
+        const { titleEl } = this.makeIconRow(ulEl, {
+          bullet: areaIcon(this.app, choice.area) ?? DEFAULT_BULLET,
+          title: choice.area,
+          description: lineage.length > 0 ? lineage.join(" \u2039 ") : undefined,
+          onOpen: areaFile
+            ? () => {
+                this.app.workspace.getLeaf("tab").openFile(areaFile);
+              }
+            : undefined,
+        });
+
+        titleEl.createEl("span", {
           text: choice.score.toFixed(2),
           cls: "dw-area-suggestion-score",
         });
 
-        const applyEl = liEl.createEl("button", {
-          text: "✓",
-          cls: "dw-area-suggestion-apply",
-          attr: { "aria-label": `Set areas to ${choice.area}` },
-        });
-        applyEl.addEventListener("click", async () => {
-          applyEl.disabled = true;
-          try {
-            await this.applyArea(activeFile, choice.area);
-            new Notice(`areas: [[${choice.area}]]`);
-          } catch (error) {
-            applyEl.disabled = false;
-            new Notice(
-              error instanceof Error ? error.message : String(error),
-            );
-          }
-        });
-
-        const trail = choice.lineage.join(" ‹ ");
-        liEl.createEl("div", {
-          text: trail ? `${trail} · ${choice.rationale}` : choice.rationale,
-          cls: "dw-list-meta",
-        });
+        this.renderApplyButton(titleEl, activeFile, choice.area, applied);
       }
     }
 
@@ -1915,6 +1923,43 @@ export class DynamicWidgetView extends ItemView {
     detailsEl.createEl("summary", { text: `JSON (${result.strategy})` });
     detailsEl.createEl("pre").createEl("code", {
       text: JSON.stringify(result, null, 2),
+    });
+  }
+
+  private renderApplyButton(
+    titleEl: HTMLElement,
+    activeFile: TFile,
+    area: string,
+    applied: Set<string>,
+  ): void {
+    const isApplied = applied.has(area);
+    const applyEl = titleEl.createEl("button", {
+      text: "\u2713",
+      cls: isApplied
+        ? "dw-area-suggestion-apply is-applied"
+        : "dw-area-suggestion-apply",
+      attr: {
+        "aria-label": isApplied ? `${area} already added` : `Add ${area} to areas`,
+      },
+    });
+
+    if (isApplied) {
+      applyEl.disabled = true;
+      return;
+    }
+
+    applyEl.addEventListener("click", async (event) => {
+      // The whole row opens the area note; applying must not also navigate.
+      event.preventDefault();
+      event.stopPropagation();
+      applyEl.disabled = true;
+      try {
+        await this.applyArea(activeFile, area);
+        new Notice(`Added [[${area}]]`);
+      } catch (error) {
+        applyEl.disabled = false;
+        new Notice(error instanceof Error ? error.message : String(error));
+      }
     });
   }
 
@@ -1946,6 +1991,14 @@ export class DynamicWidgetView extends ItemView {
       return;
     }
 
+    // Cover art, then suggestions, then the type-specific body. Hoisted out of
+    // the per-type renderers so both stay pinned to the top for every note.
+    this.renderMedia({
+      cover: this.app.metadataCache.getFileCache(activeFile)?.frontmatter?.cover,
+      activeFilePath: activeFile.path,
+    });
+    this.renderAreaSuggestions(activeFile);
+
     const activeFileType = this.determineActiveFileType(activeFile);
     switch (activeFileType) {
       case "area":
@@ -1961,7 +2014,6 @@ export class DynamicWidgetView extends ItemView {
         this.renderRelationshipContent(activeFile);
         break;
       default:
-        this.renderAreaSuggestions(activeFile);
         break;
     }
   }
