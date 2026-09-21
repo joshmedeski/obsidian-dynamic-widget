@@ -1,8 +1,7 @@
-import { execFile } from "node:child_process";
-import { existsSync } from "node:fs";
-import { homedir } from "node:os";
-import { join } from "node:path";
-import { FileSystemAdapter, type App, type TFile } from "obsidian";
+import type { App, TFile } from "obsidian";
+import { ancestors, decide } from "./classify/engine";
+import { KeywordStrategy } from "./classify/keyword";
+import type { Candidate, Decision } from "./classify/types";
 
 export interface AreaChoice {
   area: string;
@@ -43,23 +42,20 @@ export function confidenceOf(score: number): Confidence {
   return "low";
 }
 
-const ENGINE_PROJECT = join(homedir(), "c", "decision-engine");
-const TIMEOUT_MS = 20000;
-const VAULT_TIMEOUT_MS = 300000;
-const VAULT_MAX_BUFFER = 64 * 1024 * 1024;
+const AREAS_FOLDER = "Areas";
+const FALLBACK_AREA = "Inbox";
+const SKIP_DIRS = new Set([
+  AREAS_FOLDER,
+  "Assets",
+  "Days",
+  ".git",
+  ".trash",
+  ".claude",
+  ".obsidian",
+]);
+const WIKILINK = /^\[\[([^\]|#]+)/;
 
-// Obsidian launched from Finder inherits a minimal PATH that misses Homebrew
-// and the uv installer's own bin dir, so resolve the binary before spawning.
-const UV_CANDIDATES = [
-  "/opt/homebrew/bin/uv",
-  "/usr/local/bin/uv",
-  join(homedir(), ".local", "bin", "uv"),
-  join(homedir(), ".cargo", "bin", "uv"),
-];
-
-function resolveUv(): string {
-  return UV_CANDIDATES.find((path) => existsSync(path)) ?? "uv";
-}
+const strategy = new KeywordStrategy();
 
 export function hasAreas(app: App, file: TFile): boolean {
   const areas = app.metadataCache.getFileCache(file)?.frontmatter?.areas;
@@ -71,80 +67,103 @@ export async function suggestAreas(
   app: App,
   file: TFile,
 ): Promise<AreaSuggestion> {
-  const vaultPath = basePath(app);
-
-  const stdout = await run(resolveUv(), classifyArgs(join(vaultPath, file.path), vaultPath));
-
-  const parsed = JSON.parse(stdout) as AreaSuggestion;
-  if (!Array.isArray(parsed.choices)) {
-    throw new Error("Classifier returned an unexpected payload");
-  }
-  return parsed;
+  return classify(app, file, loadAreas(app));
 }
 
-/**
- * Every note in the vault in one subprocess. The CLI emits one JSON object per
- * line when handed a directory, and the whole vault takes a couple of seconds
- * -- cheaper than 3000 spawns, so there is no per-note caching here.
- */
 export async function classifyVault(app: App): Promise<AreaSuggestion[]> {
-  const vaultPath = basePath(app);
-
-  const stdout = await run(resolveUv(), classifyArgs(vaultPath, vaultPath), {
-    timeout: VAULT_TIMEOUT_MS,
-    maxBuffer: VAULT_MAX_BUFFER,
-  });
-
-  return stdout
-    .split("\n")
-    .filter((line) => line.trim() !== "")
-    .map((line) => JSON.parse(line) as AreaSuggestion)
-    .filter((entry) => Array.isArray(entry.choices));
-}
-
-function classifyArgs(target: string, vaultPath: string): string[] {
-  return [
-    "run",
-    "--project",
-    ENGINE_PROJECT,
-    "classify-note",
-    target,
-    "--json",
-    "--vault",
-    vaultPath,
-  ];
-}
-
-export function basePath(app: App): string {
-  const adapter = app.vault.adapter;
-  if (!(adapter instanceof FileSystemAdapter)) {
-    throw new Error("Area suggestions need a local vault");
+  const candidates = loadAreas(app);
+  const results: AreaSuggestion[] = [];
+  for (const file of app.vault.getMarkdownFiles()) {
+    if (!isClassifiable(file)) continue;
+    results.push(await classify(app, file, candidates));
   }
-  return adapter.getBasePath();
+  return results;
 }
 
-function run(
-  command: string,
-  args: string[],
-  options: { timeout?: number; maxBuffer?: number } = {},
-): Promise<string> {
-  return new Promise((resolve, reject) => {
-    execFile(
-      command,
-      args,
-      { timeout: TIMEOUT_MS, encoding: "utf8", ...options },
-      (error, stdout, stderr) => {
-        if (error) {
-          const detail = stderr.trim() || error.message;
-          reject(new Error(`classify-note failed: ${detail}`));
-          return;
-        }
-        if (!stdout.trim()) {
-          reject(new Error("classify-note produced no output"));
-          return;
-        }
-        resolve(stdout);
-      },
-    );
-  });
+function isClassifiable(file: TFile): boolean {
+  const parts = file.path.split("/");
+  if (parts.some((part) => part.startsWith("."))) return false;
+  return !parts.slice(0, -1).some((part) => SKIP_DIRS.has(part));
+}
+
+async function classify(
+  app: App,
+  file: TFile,
+  candidates: Candidate[],
+): Promise<AreaSuggestion> {
+  const title = file.basename;
+  const body = stripFrontmatter(await app.vault.cachedRead(file));
+  const decision = decide(
+    strategy,
+    { id: title, text: `${title}\n${body}`, title },
+    candidates,
+  );
+  return {
+    note: file.path,
+    title,
+    strategy: decision.strategy,
+    abstained: decision.abstained,
+    areas: render(decision),
+    existing_areas: frontmatterAreas(app, file),
+    choices: decision.choices.map((choice) => ({
+      area: choice.candidateId,
+      score: round(choice.score),
+      rationale: choice.rationale,
+      lineage: ancestors(choice.candidateId, candidates),
+    })),
+  };
+}
+
+function render(decision: Decision): string[] {
+  if (decision.abstained) return [`[[${FALLBACK_AREA}]]`];
+  return decision.choices.map((choice) => `[[${choice.candidateId}]]`);
+}
+
+export function loadAreas(app: App): Candidate[] {
+  return app.vault
+    .getMarkdownFiles()
+    .filter((file) => file.parent?.path === AREAS_FOLDER)
+    .sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0))
+    .map((file) => {
+      const frontmatter = app.metadataCache.getFileCache(file)?.frontmatter;
+      return {
+        id: file.basename,
+        label: file.basename,
+        aliases: asList(frontmatter?.aliases),
+        summary: asList(frontmatter?.summary)[0] ?? "",
+        parents: wikilinks(asList(frontmatter?.areas)),
+      };
+    });
+}
+
+function frontmatterAreas(app: App, file: TFile): string[] {
+  const frontmatter = app.metadataCache.getFileCache(file)?.frontmatter;
+  return wikilinks(asList(frontmatter?.areas));
+}
+
+function wikilinks(values: string[]): string[] {
+  const links: string[] = [];
+  for (const value of values) {
+    const match = WIKILINK.exec(value);
+    if (match) links.push(match[1].trim());
+  }
+  return links;
+}
+
+function asList(value: unknown): string[] {
+  if (value === null || value === undefined) return [];
+  if (Array.isArray(value)) {
+    return value.filter((v): v is string => typeof v === "string");
+  }
+  return typeof value === "string" ? [value] : [];
+}
+
+function stripFrontmatter(raw: string): string {
+  if (!raw.startsWith("---\n")) return raw;
+  const end = raw.indexOf("\n---", 4);
+  return end === -1 ? raw : raw.slice(end + 4);
+}
+
+function round(score: number): number {
+  return Math.round(score * 10000) / 10000;
 }

@@ -55,23 +55,29 @@ If the symlink is missing (fresh clone), recreate it — see `CONTRIBUTING.md`.
 ## Area suggestions
 
 Notes with no `areas:` frontmatter render a **Suggested Areas** section in the
-sidebar widget. It shells out to the `vault-areas` classifier in
-`~/c/decision-engine`:
+sidebar widget. Classification runs in-process:
 
-```bash
-uv run --project ~/c/decision-engine classify-note <abs note path> --json --vault <vault path>
+```
+src/classify/types.ts     Candidate, Subject, Choice, Decision, Strategy
+src/classify/keyword.ts   KeywordStrategy — TF-IDF with a title-position boost
+src/classify/engine.ts    decide() (threshold + top-k) and ancestors()
+src/area-suggestion.ts    Obsidian adapter: metadataCache in, AreaSuggestion out
 ```
 
-`src/area-suggestion.ts` owns the subprocess and parses that JSON; the widget
-only renders it, through the shared `makeIconRow` (icon gutter + title +
+`src/classify/` imports **nothing** — no `obsidian`, no `node:`. Keep it that
+way: that is what makes it runnable on mobile and testable outside Obsidian.
+Everything Obsidian-shaped lives in `src/area-suggestion.ts`. The widget only
+renders the result, through the shared `makeIconRow` (icon gutter + title +
 optional description) that calendar event rows also use. `updateContent` calls
 `renderMedia` and then `renderAreaSuggestions` ahead of the type switch, so
 cover art and suggestions are pinned to the top for every note type — do not
 put `renderMedia` back inside the per-type renderers. Consequences:
 
-- **`uv` and the `decision-engine` checkout are required** for the section to
-  work. Without them the section renders the stderr from the failed spawn
-  instead of results — the rest of the widget is unaffected.
+- **No external dependency.** The classifier was ported from the `vault-areas`
+  Python package in `~/c/decision-engine`; that repo is no longer required, or
+  read, at runtime. The port is exact — verified against the Python engine over
+  the 400-note gold set, identical ranking and rationale on every note, max
+  score delta 2.2e-16.
 - **Day notes are excluded.** `updateContent` skips the section when
   `determineActiveFileType` says `"day"` — a journal page never gets filed
   under an area, so a suggestion there is only noise.
@@ -88,17 +94,19 @@ put `renderMedia` back inside the per-type renderers. Consequences:
   than chosen: `evals/calibrate.py` in the decision-engine repo buckets every
   prediction over the gold set by score and reports how often it was right.
   Under 0.75 was right 19% of the time, 0.75–1.50 37%, 1.50+ 53%, which is
-  where `CONFIDENCE_MEDIUM` and `CONFIDENCE_HIGH` come from. Re-run it before
-  changing either number, or after changing the strategy.
+  where `CONFIDENCE_MEDIUM` and `CONFIDENCE_HIGH` come from. The bands are
+  still valid — the port reproduces the Python scores exactly — but they are
+  only valid for `KeywordStrategy`. Re-measure before changing either number,
+  or after changing the strategy.
 - The cache is keyed by **path alone, not `path:mtime`**. Applying an area
   rewrites frontmatter and bumps mtime, which would otherwise discard the very
   list the user is working through.
-  `updateContent` fires on every `active-leaf-change` and metadata change, so
-  spawning there would mean a process per keystroke.
 - Results are cached per `path:mtime` for the life of the view, so switching
   notes and back doesn't re-run it; editing the note invalidates the entry.
-- The JSON payload shape is defined by `vault_areas.to_dict`, not by the CLI.
-  Changing it means changing both repos.
+- `AreaSuggestion` keeps its snake_case `existing_areas` field and `note` now
+  holds a **vault-relative** path (the Python CLI emitted an absolute one).
+- `loadAreas` reads `Areas/*.md` one level deep, via `metadataCache` rather
+  than a hand-rolled YAML parser, so real frontmatter rules apply.
 
 ## Releases
 

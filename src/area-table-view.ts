@@ -7,7 +7,6 @@ import {
 } from "obsidian";
 import {
   type AreaSuggestion,
-  basePath,
   classifyVault,
   confidenceOf,
 } from "./area-suggestion";
@@ -94,11 +93,8 @@ export class AreaTableView extends ItemView {
     this.render();
 
     try {
-      const vaultPath = basePath(this.app);
       const suggestions = await classifyVault(this.app);
-      this.rows = suggestions.map((suggestion) =>
-        toRow(this.app, suggestion, vaultPath),
-      );
+      this.rows = suggestions.map((suggestion) => toRow(this.app, suggestion));
     } catch (error) {
       this.error = error instanceof Error ? error.message : String(error);
       this.rows = [];
@@ -350,19 +346,8 @@ export class AreaTableView extends ItemView {
   }
 }
 
-/**
- * The classifier walks the filesystem, which on macOS hands back decomposed
- * (NFD) filenames for anything accented -- "Andr\u00e9" arrives as "Andre" plus a
- * combining acute. Obsidian stores every path composed (NFC), so the two forms
- * are the same name and different strings, and a raw lookup misses every note
- * with a diacritic in its title.
- */
-function toRow(app: App, suggestion: AreaSuggestion, vaultPath: string): Row {
-  const absolute = suggestion.note.normalize("NFC");
-  const base = vaultPath.normalize("NFC");
-  const path = absolute.startsWith(`${base}/`)
-    ? absolute.slice(base.length + 1)
-    : absolute;
+function toRow(app: App, suggestion: AreaSuggestion): Row {
+  const path = suggestion.note;
   return {
     suggestion,
     path,
