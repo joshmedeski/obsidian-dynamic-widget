@@ -1822,22 +1822,15 @@ export class DynamicWidgetView extends ItemView {
     this.contentEl.appendChild(sectionEl);
   }
 
-  /**
-   * Ranked areas from the vault-areas classifier, rendered directly under the
-   * cover image. Classifying is gated on the note having no `areas:` prop, but
-   * a result already computed stays on screen after one is applied so further
-   * areas can be added from the same list.
-   */
   private renderAreaSuggestions(activeFile: TFile): void {
     if (this.plugin.privateMode && isFilePrivate(this.app, activeFile)) {
       return;
     }
-
-    const cached = this.suggestionCache.get(activeFile.path);
-    const classifiable = !hasAreas(this.app, activeFile);
-    if (!cached && !classifiable) {
+    if (hasAreas(this.app, activeFile)) {
       return;
     }
+
+    const cached = this.suggestionCache.get(activeFile.path);
 
     const sectionEl = this.contentEl.createEl("section", {
       cls: "dw-area-suggestion",

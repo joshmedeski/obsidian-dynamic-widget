@@ -81,11 +81,9 @@ put `renderMedia` back inside the per-type renderers. Consequences:
 - **Day notes are excluded.** `updateContent` skips the section when
   `determineActiveFileType` says `"day"` — a journal page never gets filed
   under an area, so a suggestion there is only noise.
-- **Classifying is gated on the note having no `areas:` prop** (`hasAreas`);
-  *displaying* a result is not. Once computed, the list stays up after an area
-  is applied so more can be added from it — the section renders whenever
-  there's a cached result, whatever the note's type became. `areas: []` counts
-  as *having* the prop, so it never triggers a classify.
+- **The section is hidden whenever the note has a non-empty `areas:` prop**
+  (`hasAreas`), cached result or not — applying an area from the list removes
+  the section. `areas: []` counts as *no* areas, so the section still shows.
 - The classifier runs **only when the button is clicked**, never on note open.
 - **Clicking a row files the note under that area** via `processFrontMatter`;
   it does not navigate to the area note. Rows for areas already in the
