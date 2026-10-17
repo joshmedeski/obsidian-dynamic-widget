@@ -678,87 +678,98 @@ export class DynamicWidgetView extends ItemView {
     const sectionEl = document.createElement("section");
     sectionEl.createEl("h3", { text: title });
     const gridEl = sectionEl.createEl("div", { cls: "dynamic-widget-grid" });
-
-    for (const note of files) {
-      const metadata = this.app.metadataCache.getFileCache(note);
-      const isPrivate =
-        this.plugin.privateMode &&
-        (note.path.startsWith("Relationships/") ||
-          isFilePrivate(this.app, note));
-      const isActive = activeFile !== null && activeFile.path === note.path;
-
-      const cardEl = gridEl.createEl("div", {
-        cls: "dynamic-widget-grid-item",
-      });
-      if (isActive) {
-        cardEl.classList.add("is-active");
-      }
-
-      const icon = metadata?.frontmatter?.icon;
-      const rawTitle = metadata?.frontmatter?.title || note.basename;
-      const label = isPrivate ? redactText(rawTitle) : rawTitle;
-
-      const coverFile = isPrivate
-        ? null
-        : this.resolveCoverFile(metadata?.frontmatter?.cover, note.path);
-
-      // The badge sits outside the circle's `overflow: hidden`, so the cover
-      // needs a positioned wrapper of its own.
-      const coverWrapEl = cardEl.createEl("div", {
-        cls: "dynamic-widget-grid-cover-wrap",
-      });
-      const coverEl = coverWrapEl.createEl("div", {
-        cls: "dynamic-widget-grid-cover",
-      });
-      if (coverFile) {
-        coverEl.createEl("img", {
-          attr: {
-            src: this.app.vault.getResourcePath(coverFile),
-            alt: label,
-          },
-        });
-        // With a photo the icon reads better as a badge on the circle than
-        // inline with the name.
-        if (icon) {
-          coverWrapEl.createEl("span", {
-            cls: "dynamic-widget-grid-icon",
-            text: icon,
-          });
-        }
-      } else {
-        coverEl.classList.add("is-placeholder");
-        coverEl.createEl("span", { text: icon || rawTitle.charAt(0) });
-      }
-
-      const nameEl = cardEl.createEl("div", {
-        cls: "dynamic-widget-grid-name",
-        text: label,
-      });
-      if (isPrivate) {
-        nameEl.classList.add("dynamic-widget-private");
-      }
-
-      if (!isPrivate && !isActive) {
-        cardEl.setAttribute("role", "button");
-        cardEl.setAttribute("tabindex", "0");
-        const open = (event: Event): void => {
-          event.preventDefault();
-          this.app.workspace.getLeaf("tab").openFile(note);
-        };
-        cardEl.addEventListener("click", open);
-        cardEl.addEventListener("keydown", (event) => {
-          if (event.key === "Enter" || event.key === " ") open(event);
-        });
-      }
-    }
-
+    for (const note of files) this.makeCoverCard(gridEl, note, activeFile);
     return sectionEl;
   }
 
-  private resolveCoverFile(
-    cover: unknown,
-    sourcePath: string,
-  ): TFile | null {
+  private isNotePrivate(note: TFile): boolean {
+    return (
+      this.plugin.privateMode &&
+      (note.path.startsWith("Relationships/") || isFilePrivate(this.app, note))
+    );
+  }
+
+  private noteCoverFile(note: TFile): TFile | null {
+    if (this.isNotePrivate(note)) return null;
+    return this.resolveCoverFile(
+      this.app.metadataCache.getFileCache(note)?.frontmatter?.cover,
+      note.path,
+    );
+  }
+
+  private makeCoverCard(
+    gridEl: HTMLElement,
+    note: TFile,
+    activeFile: TFile | null,
+  ): void {
+    const metadata = this.app.metadataCache.getFileCache(note);
+    const isPrivate = this.isNotePrivate(note);
+    const isActive = activeFile !== null && activeFile.path === note.path;
+
+    const cardEl = gridEl.createEl("div", {
+      cls: "dynamic-widget-grid-item",
+    });
+    if (isActive) {
+      cardEl.classList.add("is-active");
+    }
+
+    const icon = metadata?.frontmatter?.icon;
+    const rawTitle = metadata?.frontmatter?.title || note.basename;
+    const label = isPrivate ? redactText(rawTitle) : rawTitle;
+
+    const coverFile = this.noteCoverFile(note);
+
+    // The badge sits outside the circle's `overflow: hidden`, so the cover
+    // needs a positioned wrapper of its own.
+    const coverWrapEl = cardEl.createEl("div", {
+      cls: "dynamic-widget-grid-cover-wrap",
+    });
+    const coverEl = coverWrapEl.createEl("div", {
+      cls: "dynamic-widget-grid-cover",
+    });
+    if (coverFile) {
+      coverEl.createEl("img", {
+        attr: {
+          src: this.app.vault.getResourcePath(coverFile),
+          alt: label,
+        },
+      });
+      // With a photo the icon reads better as a badge on the circle than
+      // inline with the name.
+      if (icon) {
+        coverWrapEl.createEl("span", {
+          cls: "dynamic-widget-grid-icon",
+          text: icon,
+        });
+      }
+    } else {
+      coverEl.classList.add("is-placeholder");
+      coverEl.createEl("span", { text: icon || rawTitle.charAt(0) });
+    }
+
+    const nameEl = cardEl.createEl("div", {
+      cls: "dynamic-widget-grid-name",
+      text: label,
+    });
+    if (isPrivate) {
+      nameEl.classList.add("dynamic-widget-private");
+    }
+
+    if (!isPrivate && !isActive) {
+      cardEl.setAttribute("role", "button");
+      cardEl.setAttribute("tabindex", "0");
+      const open = (event: Event): void => {
+        event.preventDefault();
+        this.app.workspace.getLeaf("tab").openFile(note);
+      };
+      cardEl.addEventListener("click", open);
+      cardEl.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" || event.key === " ") open(event);
+      });
+    }
+  }
+
+  private resolveCoverFile(cover: unknown, sourcePath: string): TFile | null {
     if (typeof cover !== "string" || cover.length === 0) return null;
     const cleanCover = cover.replace(/\[\[|\]\]/g, "");
     const coverFile = this.app.metadataCache.getFirstLinkpathDest(
@@ -788,28 +799,26 @@ export class DynamicWidgetView extends ItemView {
     const ulEl = document.createElement("ul");
     const activeFile = this.app.workspace.getActiveFile();
 
-    // Add emoji bullet class
     ulEl.classList.add("dw-list");
 
-    const liEls = list
-      .sort((a, b) => {
-        const aMetadata = this.app.metadataCache.getFileCache(a);
-        const bMetadata = this.app.metadataCache.getFileCache(b);
-        const areaA = aMetadata?.frontmatter?.areas?.[0]; // might not exist
-        const areaB = bMetadata?.frontmatter?.areas?.[0]; // might not exist
-        if (areaA && areaB) {
-          return areaA.localeCompare(areaB);
-        }
-        if (areaA && !areaB) return -1;
-        if (!areaA && areaB) return 1;
-        if (!areaA && !areaB) return 0;
-      })
+    const sorted = list.sort((a, b) => {
+      const aMetadata = this.app.metadataCache.getFileCache(a);
+      const bMetadata = this.app.metadataCache.getFileCache(b);
+      const areaA = aMetadata?.frontmatter?.areas?.[0]; // might not exist
+      const areaB = bMetadata?.frontmatter?.areas?.[0]; // might not exist
+      if (areaA && areaB) {
+        return areaA.localeCompare(areaB);
+      }
+      if (areaA && !areaB) return -1;
+      if (!areaA && areaB) return 1;
+      if (!areaA && !areaB) return 0;
+    });
+    const withCover = sorted.filter((note) => this.noteCoverFile(note));
+    const liEls = sorted
+      .filter((note) => !this.noteCoverFile(note))
       .map((note) => {
         const projectEl = document.createElement("li");
-        const isPrivate =
-          this.plugin.privateMode &&
-          (note.path.startsWith("Relationships/") ||
-            isFilePrivate(this.app, note));
+        const isPrivate = this.isNotePrivate(note);
 
         if (activeFile && activeFile.path === note.path) {
           const span = projectEl.createEl("span", {
@@ -865,7 +874,15 @@ export class DynamicWidgetView extends ItemView {
     for (const liEl of liEls) {
       ulEl.appendChild(liEl);
     }
-    return ulEl;
+    if (withCover.length === 0) return ulEl;
+
+    const containerEl = document.createElement("div");
+    const gridEl = containerEl.createEl("div", {
+      cls: "dynamic-widget-grid is-media",
+    });
+    for (const note of withCover) this.makeCoverCard(gridEl, note, activeFile);
+    if (liEls.length > 0) containerEl.appendChild(ulEl);
+    return containerEl;
   }
 
   /**

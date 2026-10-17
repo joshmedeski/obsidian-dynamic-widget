@@ -601,6 +601,24 @@
   overflow: hidden;
 }
 
+.dynamic-widget-grid.is-media {
+  align-items: start;
+}
+
+.dynamic-widget-grid.is-media .dynamic-widget-grid-cover-wrap {
+  width: 100%;
+}
+
+.dynamic-widget-grid.is-media .dynamic-widget-grid-cover {
+  width: 100%;
+  height: auto;
+  border-radius: 6px;
+}
+
+.dynamic-widget-grid.is-media .dynamic-widget-grid-cover img {
+  height: auto;
+}
+
 
 .dw-area-suggestion-run {
   font-size: var(--font-smaller);
