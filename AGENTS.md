@@ -106,6 +106,16 @@ put `renderMedia` back inside the per-type renderers. Consequences:
 - `loadAreas` reads `Areas/*.md` one level deep, via `metadataCache` rather
   than a hand-rolled YAML parser, so real frontmatter rules apply.
 
+## Inbox triage
+
+`src/inbox-triage-view.ts` (command **Open Inbox Triage**) walks `Inbox/` one
+note at a time. The queue is ordered by the area tree: a depth-first walk of
+`getAreaHierarchy` (top-level `priority`, then children), each note ranked by
+its best area, oldest `ctime` breaking ties, area-less notes last. Keys live in
+the `ROUTES` table — each is a folder plus an optional `type` it overwrites.
+Filed notes stay in the queue for the session, so `i` moves one back to the
+Inbox. `d` trashes through `fileManager.trashFile` after a confirm modal.
+
 ## Releases
 
 Tag-driven. The tag must match `public/manifest.json`'s `version`, no `v` prefix:

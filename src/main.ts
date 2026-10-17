@@ -4,6 +4,10 @@ import { AreaTableView, VIEW_TYPE_AREA_TABLE } from './area-table-view';
 import { AreaTriageView, VIEW_TYPE_AREA_TRIAGE } from './area-triage-view';
 import { AreasView, VIEW_TYPE_AREAS } from './areas-view';
 import {
+  InboxTriageView,
+  VIEW_TYPE_INBOX_TRIAGE,
+} from './inbox-triage-view';
+import {
   DynamicWidgetView,
   VIEW_TYPE_DYNAMIC_WIDGET,
 } from './dynamic-widget-view';
@@ -58,6 +62,11 @@ export default class DynamicWidgetPlugin extends Plugin {
       (leaf) => new AreaTriageView(leaf, this)
     );
 
+    this.registerView(
+      VIEW_TYPE_INBOX_TRIAGE,
+      (leaf) => new InboxTriageView(leaf, this)
+    );
+
     // Register the area table view
     this.registerView(
       VIEW_TYPE_AREA_TABLE,
@@ -108,6 +117,14 @@ export default class DynamicWidgetPlugin extends Plugin {
       name: 'Open Area Triage',
       callback: () => {
         this.activateAreaTriageView();
+      },
+    });
+
+    this.addCommand({
+      id: 'open-inbox-triage-view',
+      name: 'Open Inbox Triage',
+      callback: () => {
+        this.activateInboxTriageView();
       },
     });
 
@@ -202,6 +219,12 @@ export default class DynamicWidgetPlugin extends Plugin {
       (leaf.view as AreaTriageView).refreshContent();
     }
 
+    for (const leaf of this.app.workspace.getLeavesOfType(
+      VIEW_TYPE_INBOX_TRIAGE,
+    )) {
+      (leaf.view as InboxTriageView).refreshContent();
+    }
+
     // Re-render area table view
     const tableLeaves = this.app.workspace.getLeavesOfType(
       VIEW_TYPE_AREA_TABLE,
@@ -260,6 +283,15 @@ export default class DynamicWidgetPlugin extends Plugin {
     const leaf = this.app.workspace.getLeaf('tab');
     await leaf.setViewState({
       type: VIEW_TYPE_AREA_TRIAGE,
+      active: true,
+    });
+    this.app.workspace.revealLeaf(leaf);
+  }
+
+  async activateInboxTriageView() {
+    const leaf = this.app.workspace.getLeaf('tab');
+    await leaf.setViewState({
+      type: VIEW_TYPE_INBOX_TRIAGE,
       active: true,
     });
     this.app.workspace.revealLeaf(leaf);

@@ -7,6 +7,10 @@ import {
   suggestAreas,
 } from "./area-suggestion";
 import { type CalendarEvent, fetchEventsForDate } from "./calendar";
+import {
+  type InboxTriageView,
+  VIEW_TYPE_INBOX_TRIAGE,
+} from "./inbox-triage-view";
 import type DynamicWidgetPlugin from "./main";
 import {
   areaIcon,
@@ -1957,6 +1961,12 @@ export class DynamicWidgetView extends ItemView {
       return;
     }
     this.contentEl.empty();
+
+    const mainView = this.app.workspace.getMostRecentLeaf()?.view;
+    if (mainView?.getViewType() === VIEW_TYPE_INBOX_TRIAGE) {
+      (mainView as InboxTriageView).renderQueue(this.contentEl);
+      return;
+    }
 
     const activeFile = this.app.workspace.getActiveFile();
     if (!activeFile) {

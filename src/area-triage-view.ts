@@ -620,7 +620,7 @@ function topFolder(file: TFile): string {
  * Matching runs over the area name plus its parent chain, so typing a parent
  * narrows to its children.
  */
-class AreaPickerModal extends FuzzySuggestModal<TFile> {
+export class AreaPickerModal extends FuzzySuggestModal<TFile> {
   private plugin: DynamicWidgetPlugin;
   private onPick: (area: string) => void;
   // Resolved once: the modal asks for a lineage on every keystroke, for every

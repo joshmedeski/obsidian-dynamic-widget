@@ -1036,3 +1036,118 @@
 .area-table-empty {
   color: var(--text-faint);
 }
+
+.dynamic-widget-content:has(> .inbox-triage-queue) {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.inbox-triage-queue {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.inbox-triage-keys {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 6px;
+  position: sticky;
+  bottom: -1em;
+  margin-top: auto;
+  padding: 12px 0 1em;
+  border-top: 1px solid var(--background-modifier-border);
+}
+
+.inbox-triage-key {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 10px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.inbox-triage-key span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.inbox-triage-key kbd {
+  flex-shrink: 0;
+  min-width: 1.6em;
+  text-align: center;
+}
+
+.inbox-triage-keys .area-triage-hint {
+  grid-column: 1 / -1;
+}
+
+.inbox-triage-props {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 4px 16px;
+  margin: 0;
+  font-size: var(--font-smaller);
+}
+
+.inbox-triage-props dt {
+  color: var(--text-muted);
+}
+
+.inbox-triage-props dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.inbox-triage-preview {
+  user-select: text;
+}
+
+.inbox-triage-content {
+  max-width: none;
+}
+
+.inbox-triage-key:disabled {
+  opacity: 0.35;
+  box-shadow: none;
+  background-color: transparent;
+  border: 1px dashed var(--background-modifier-border);
+  cursor: not-allowed;
+}
+
+.inbox-triage-bar {
+  margin: 6px 0 4px;
+}
+
+.inbox-triage-queue .dw-list-title.is-filed {
+  text-decoration: line-through;
+  opacity: 0.6;
+}
+
+.inbox-triage-content .area-triage-note {
+  align-items: center;
+}
+
+.inbox-triage-content .area-triage-note-icon,
+.inbox-triage-content .area-triage-note-title {
+  font-family: var(--inline-title-font);
+  font-size: var(--inline-title-size);
+  font-weight: var(--inline-title-weight);
+  line-height: var(--inline-title-line-height);
+  letter-spacing: -0.015em;
+}
+
+.inbox-triage-content .area-triage-note-title {
+  color: var(--inline-title-color);
+}
+
+.inbox-triage-content .area-triage-note {
+  grid-template-columns: auto 1fr auto;
+  padding: 0;
+  border: none;
+  background-color: transparent;
+}
