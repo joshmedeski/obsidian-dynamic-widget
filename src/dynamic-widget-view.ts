@@ -7,10 +7,7 @@ import {
   suggestAreas,
 } from "./area-suggestion";
 import { type CalendarEvent, fetchEventsForDate } from "./calendar";
-import {
-  type InboxTriageView,
-  VIEW_TYPE_INBOX_TRIAGE,
-} from "./inbox-triage-view";
+import { FolderTriageView } from "./folder-triage-view";
 import type DynamicWidgetPlugin from "./main";
 import {
   areaIcon,
@@ -910,9 +907,23 @@ export class DynamicWidgetView extends ItemView {
       now.getDate(),
     ).getTime();
 
+    const startOfTomorrow = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate() + 1,
+    ).getTime();
+
+    const soonestFirst = (a: (typeof dated)[number], b: (typeof dated)[number]) =>
+      a.date.getTime() - b.date.getTime();
     const upcoming = dated
-      .filter((entry) => entry.date.getTime() >= startOfToday)
-      .sort((a, b) => a.date.getTime() - b.date.getTime());
+      .filter((entry) => entry.date.getTime() >= startOfTomorrow)
+      .sort(soonestFirst);
+    const today = dated
+      .filter((entry) => {
+        const ms = entry.date.getTime();
+        return ms >= startOfToday && ms < startOfTomorrow;
+      })
+      .sort(soonestFirst);
     const past = dated
       .filter((entry) => entry.date.getTime() < startOfToday)
       .sort((a, b) => b.date.getTime() - a.date.getTime());
@@ -921,6 +932,7 @@ export class DynamicWidgetView extends ItemView {
     sectionEl.createEl("h3", { text: title });
 
     const groups: { label: string; entries: typeof dated }[] = [
+      { label: "Today", entries: today },
       { label: "Upcoming", entries: upcoming },
     ];
     // Years of meetings pile up behind an active area, so the past gets the
@@ -1963,8 +1975,8 @@ export class DynamicWidgetView extends ItemView {
     this.contentEl.empty();
 
     const mainView = this.app.workspace.getMostRecentLeaf()?.view;
-    if (mainView?.getViewType() === VIEW_TYPE_INBOX_TRIAGE) {
-      (mainView as InboxTriageView).renderQueue(this.contentEl);
+    if (mainView instanceof FolderTriageView) {
+      mainView.renderQueue(this.contentEl);
       return;
     }
 

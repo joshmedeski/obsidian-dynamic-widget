@@ -4,9 +4,10 @@ import { AreaTableView, VIEW_TYPE_AREA_TABLE } from './area-table-view';
 import { AreaTriageView, VIEW_TYPE_AREA_TRIAGE } from './area-triage-view';
 import { AreasView, VIEW_TYPE_AREAS } from './areas-view';
 import {
-  InboxTriageView,
-  VIEW_TYPE_INBOX_TRIAGE,
-} from './inbox-triage-view';
+  FolderTriageView,
+  openFolderPicker,
+  VIEW_TYPE_FOLDER_TRIAGE,
+} from './folder-triage-view';
 import {
   DynamicWidgetView,
   VIEW_TYPE_DYNAMIC_WIDGET,
@@ -63,8 +64,8 @@ export default class DynamicWidgetPlugin extends Plugin {
     );
 
     this.registerView(
-      VIEW_TYPE_INBOX_TRIAGE,
-      (leaf) => new InboxTriageView(leaf, this)
+      VIEW_TYPE_FOLDER_TRIAGE,
+      (leaf) => new FolderTriageView(leaf, this)
     );
 
     // Register the area table view
@@ -124,7 +125,17 @@ export default class DynamicWidgetPlugin extends Plugin {
       id: 'open-inbox-triage-view',
       name: 'Open Inbox Triage',
       callback: () => {
-        this.activateInboxTriageView();
+        this.activateFolderTriageView('Inbox');
+      },
+    });
+
+    this.addCommand({
+      id: 'open-folder-triage-view',
+      name: 'Triage Folder…',
+      callback: () => {
+        openFolderPicker(this.app, (folder) => {
+          this.activateFolderTriageView(folder);
+        });
       },
     });
 
@@ -220,9 +231,9 @@ export default class DynamicWidgetPlugin extends Plugin {
     }
 
     for (const leaf of this.app.workspace.getLeavesOfType(
-      VIEW_TYPE_INBOX_TRIAGE,
+      VIEW_TYPE_FOLDER_TRIAGE,
     )) {
-      (leaf.view as InboxTriageView).refreshContent();
+      (leaf.view as FolderTriageView).refreshContent();
     }
 
     // Re-render area table view
@@ -288,10 +299,11 @@ export default class DynamicWidgetPlugin extends Plugin {
     this.app.workspace.revealLeaf(leaf);
   }
 
-  async activateInboxTriageView() {
+  async activateFolderTriageView(folder: string) {
     const leaf = this.app.workspace.getLeaf('tab');
     await leaf.setViewState({
-      type: VIEW_TYPE_INBOX_TRIAGE,
+      type: VIEW_TYPE_FOLDER_TRIAGE,
+      state: { folder },
       active: true,
     });
     this.app.workspace.revealLeaf(leaf);

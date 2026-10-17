@@ -106,15 +106,21 @@ put `renderMedia` back inside the per-type renderers. Consequences:
 - `loadAreas` reads `Areas/*.md` one level deep, via `metadataCache` rather
   than a hand-rolled YAML parser, so real frontmatter rules apply.
 
-## Inbox triage
+## Folder triage
 
-`src/inbox-triage-view.ts` (command **Open Inbox Triage**) walks `Inbox/` one
-note at a time. The queue is ordered by the area tree: a depth-first walk of
-`getAreaHierarchy` (top-level `priority`, then children), each note ranked by
-its best area, oldest `ctime` breaking ties, area-less notes last. Keys live in
-the `ROUTES` table — each is a folder plus an optional `type` it overwrites.
-Filed notes stay in the queue for the session, so `i` moves one back to the
-Inbox. `d` trashes through `fileManager.trashFile` after a confirm modal.
+`src/folder-triage-view.ts` walks one folder (recursively) a note at a time.
+**Open Inbox Triage** starts on `Inbox/`; **Triage Folder…**, `F`, or clicking
+the sidebar heading picks any other folder. The folder is view state
+(`getState`/`setState`), so it survives a reload; the view type id is still
+`inbox-triage-view` so existing panes keep working. The queue is ordered by the
+area tree: a depth-first walk of `getAreaHierarchy` (top-level `priority`, then
+children), each note ranked by its best area, oldest `ctime` breaking ties,
+area-less notes last. Keys live in the `ROUTES` table — each is a folder plus
+an optional `type` it overwrites. A note is "filed" once it is outside the
+triaged folder; it stays in the queue struck through, so pressing the source
+folder's key moves it back. `d` trashes through `fileManager.trashFile` after a
+confirm modal. While the view is the most recent main leaf, the Dynamic Widget
+renders the queue (`renderQueue`) instead of its normal content.
 
 ## Releases
 

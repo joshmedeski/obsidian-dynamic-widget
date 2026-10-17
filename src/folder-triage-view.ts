@@ -1,11 +1,14 @@
 import {
   type App,
   Component,
+  FuzzySuggestModal,
   ItemView,
   MarkdownRenderer,
   Modal,
   Notice,
   type TFile,
+  type TFolder,
+  type ViewStateResult,
   type WorkspaceLeaf,
 } from "obsidian";
 import { AreaPickerModal } from "./area-triage-view";
@@ -27,9 +30,11 @@ import {
   simplifyWikiLink,
 } from "./utils";
 
-export const VIEW_TYPE_INBOX_TRIAGE = "inbox-triage-view";
+export const VIEW_TYPE_FOLDER_TRIAGE = "inbox-triage-view";
 
 const INBOX = "Inbox";
+const WIKILINK = /^\[\[[^\]]+\]\]$/;
+const HIDDEN_PROPS = new Set(["position", "icon"]);
 
 interface Route {
   key: string;
@@ -55,13 +60,15 @@ interface Ranked {
   root: string | null;
 }
 
-export class InboxTriageView extends ItemView {
+export class FolderTriageView extends ItemView {
   contentEl: HTMLElement = document.createElement("div");
   private plugin: DynamicWidgetPlugin;
   private queue: TFile[] = [];
   private index = 0;
+  private folder = INBOX;
   private filed = new Map<TFile, string>();
   private ranks = new Map<TFile, Ranked>();
+  private crossed = new Set<TFile>();
   private preview: Component | null = null;
 
   constructor(leaf: WorkspaceLeaf, plugin: DynamicWidgetPlugin) {
@@ -70,11 +77,43 @@ export class InboxTriageView extends ItemView {
   }
 
   getViewType(): string {
-    return VIEW_TYPE_INBOX_TRIAGE;
+    return VIEW_TYPE_FOLDER_TRIAGE;
   }
 
   getDisplayText(): string {
-    return "Inbox Triage";
+    return `${this.folder} Triage`;
+  }
+
+  getState(): Record<string, unknown> {
+    return { folder: this.folder };
+  }
+
+  async setState(state: unknown, result: ViewStateResult): Promise<void> {
+    const folder = (state as { folder?: unknown } | null)?.folder;
+    if (typeof folder === "string" && folder !== this.folder) {
+      this.folder = folder;
+      this.index = 0;
+      this.refreshContent();
+    }
+    await super.setState(state, result);
+  }
+
+  private inFolder(file: TFile): boolean {
+    return file.path.startsWith(`${this.folder}/`);
+  }
+
+  private isDone(file: TFile): boolean {
+    return this.crossed.has(file) || !this.inFolder(file);
+  }
+
+  private chooseFolder(): void {
+    new FolderPickerModal(this.app, (folder) => {
+      void this.leaf.setViewState({
+        type: VIEW_TYPE_FOLDER_TRIAGE,
+        state: { folder },
+        active: true,
+      });
+    }).open();
   }
 
   getIcon(): string {
@@ -100,6 +139,11 @@ export class InboxTriageView extends ItemView {
     this.registerDomEvent(this.contentEl, "keydown", (event) => {
       this.onKeydown(event);
     });
+    this.registerEvent(
+      this.app.workspace.on("active-leaf-change", (leaf) => {
+        if (leaf === this.leaf) this.contentEl.focus();
+      }),
+    );
 
     this.rebuildQueue();
     this.render();
@@ -114,11 +158,12 @@ export class InboxTriageView extends ItemView {
     const order = areaOrder(this.app);
     this.ranks.clear();
     this.filed.clear();
+    this.crossed.clear();
     this.queue = this.app.vault
       .getMarkdownFiles()
       .filter(
         (file) =>
-          file.path.startsWith(`${INBOX}/`) &&
+          this.inFolder(file) &&
           !(this.plugin.privateMode && isFilePrivate(this.app, file)),
       );
     for (const file of this.queue) {
@@ -146,7 +191,9 @@ export class InboxTriageView extends ItemView {
     if (!file) {
       this.contentEl.createEl("p", {
         text:
-          this.queue.length === 0 ? "Inbox zero." : "End of the queue.",
+          this.queue.length === 0
+            ? `${this.folder} is empty.`
+            : "End of the queue.",
         cls: "areas-view-empty",
       });
     } else {
@@ -165,11 +212,16 @@ export class InboxTriageView extends ItemView {
   renderQueue(parent: HTMLElement): void {
     const wrapper = parent.createEl("div", { cls: "inbox-triage-queue" });
     const el = wrapper.createEl("section");
-    el.createEl("h3", { text: "\u{1F4E5} Inbox Triage" });
+    const heading = el.createEl("h3", {
+      text: `${this.folder === INBOX ? "\u{1F4E5}" : "\u{1F4C2}"} ${this.folder} Triage`,
+      cls: "inbox-triage-heading",
+      attr: { "aria-label": "Change folder (F)" },
+    });
+    heading.addEventListener("click", () => {
+      this.chooseFolder();
+    });
 
-    const done = this.queue.filter(
-      (f) => this.filed.has(f) && this.filed.get(f) !== INBOX,
-    ).length;
+    const done = this.queue.filter((f) => this.isDone(f)).length;
     el.createEl("div", {
       text:
         this.queue.length === 0
@@ -223,7 +275,7 @@ export class InboxTriageView extends ItemView {
       itemEl.addClass("dw-list-item");
       itemEl.style.setProperty("--emoji-bullet", `"${noteBullet(this.app, file)}"`);
       const linkEl = itemEl.createEl("a", { text: title, cls: "dw-list-title" });
-      if (!file.path.startsWith(`${INBOX}/`)) linkEl.addClass("is-filed");
+      if (this.isDone(file)) linkEl.addClass("is-filed");
       linkEl.addEventListener("click", (event) => {
         event.preventDefault();
         this.index = position;
@@ -235,12 +287,31 @@ export class InboxTriageView extends ItemView {
     this.renderKeys(wrapper);
   }
 
-  private areaLabel(area: string): string {
+  private areaPriority(area: string): string | null {
     const file = this.app.vault.getFileByPath(`Areas/${area}.md`);
     const priority = file
       ? this.app.metadataCache.getFileCache(file)?.frontmatter?.priority
       : null;
+    return priority != null ? String(priority) : null;
+  }
+
+  private areaLabel(area: string): string {
+    const priority = this.areaPriority(area);
     return priority != null ? `${priority}. ${area}` : area;
+  }
+
+  private jumpToPriority(priority: string): void {
+    const next = this.queue.findIndex((file) => {
+      const root = this.ranks.get(file)?.root;
+      return (
+        !this.isDone(file) &&
+        root != null &&
+        this.areaPriority(root) === priority
+      );
+    });
+    if (next === -1) return;
+    this.index = next;
+    this.render();
   }
 
   private areaColor(area: string): string | null {
@@ -289,21 +360,42 @@ export class InboxTriageView extends ItemView {
   private renderProps(file: TFile): void {
     const frontmatter = this.app.metadataCache.getFileCache(file)?.frontmatter;
     const entries = Object.entries(frontmatter ?? {}).filter(
-      ([name]) => name !== "position",
+      ([name]) => !HIDDEN_PROPS.has(name),
     );
     if (entries.length === 0) return;
 
     const list = this.contentEl.createEl("dl", { cls: "inbox-triage-props" });
     for (const [name, value] of entries) {
       list.createEl("dt", { text: name });
-      list.createEl("dd", {
-        text: Array.isArray(value)
-          ? value.map(String).join(", ")
-          : typeof value === "object" && value !== null
-            ? JSON.stringify(value)
-            : String(value),
+      const dd = list.createEl("dd");
+      const values: unknown[] = Array.isArray(value) ? value : [value];
+      values.forEach((item, i) => {
+        if (i > 0) dd.appendText(", ");
+        this.renderPropValue(dd, item, file);
       });
     }
+  }
+
+  private renderPropValue(el: HTMLElement, value: unknown, file: TFile): void {
+    const text =
+      typeof value === "object" && value !== null
+        ? JSON.stringify(value)
+        : String(value);
+    if (!WIKILINK.test(text)) {
+      el.appendText(text);
+      return;
+    }
+    const target = simplifyWikiLink(text);
+    const alias = text.slice(2, -2).split("|")[1]?.trim();
+    const link = el.createEl("a", {
+      text: alias || target,
+      cls: "internal-link",
+      href: target,
+    });
+    link.addEventListener("click", (event) => {
+      event.preventDefault();
+      void this.app.workspace.openLinkText(target, file.path, "tab");
+    });
   }
 
   private async renderContent(file: TFile): Promise<void> {
@@ -345,10 +437,11 @@ export class InboxTriageView extends ItemView {
       ["c", "Area", (f) => f && this.chooseArea(f)],
       ["o", "Open", () => this.openCurrent()],
       ["R", "Rescan", () => this.refreshContent()],
+      ["F", "Folder", () => this.chooseFolder()],
     ];
     for (const [key, label, run] of commands) {
       const button = this.keyButton(grid, key, label);
-      button.disabled = !file && key !== "R";
+      button.disabled = !file && key !== "R" && key !== "F";
       button.addEventListener("click", () => {
         this.focusView();
         run(file);
@@ -356,7 +449,7 @@ export class InboxTriageView extends ItemView {
     }
 
     grid.createEl("div", {
-      text: "j/k or arrows move · i returns a filed note to the Inbox",
+      text: "Tab cross off · Shift+Tab undo · 1-9 jump to an area · j/k or arrows move · press a folder's key to move a filed note back",
       cls: "area-triage-hint",
     });
   }
@@ -454,6 +547,30 @@ export class InboxTriageView extends ItemView {
     if (event.key === "R") {
       event.preventDefault();
       this.refreshContent();
+      return;
+    }
+    if (event.key === "Tab") {
+      event.preventDefault();
+      if (event.shiftKey) {
+        this.move(-1);
+        const previous = this.current();
+        if (previous) this.crossed.delete(previous);
+        this.render();
+      } else {
+        const file = this.current();
+        if (file) this.crossed.add(file);
+        this.move(1);
+      }
+      return;
+    }
+    if (event.key === "F") {
+      event.preventDefault();
+      this.chooseFolder();
+      return;
+    }
+    if (event.key >= "1" && event.key <= "9") {
+      event.preventDefault();
+      this.jumpToPriority(event.key);
       return;
     }
     const key = event.key.toLowerCase();
@@ -562,4 +679,33 @@ class ConfirmDeleteModal extends Modal {
   onClose(): void {
     this.contentEl.empty();
   }
+}
+
+class FolderPickerModal extends FuzzySuggestModal<TFolder> {
+  constructor(
+    app: App,
+    private onPick: (folder: string) => void,
+  ) {
+    super(app);
+    this.setPlaceholder("Triage which folder\u2026");
+  }
+
+  getItems(): TFolder[] {
+    return this.app.vault.getAllFolders(false);
+  }
+
+  getItemText(folder: TFolder): string {
+    return folder.path;
+  }
+
+  onChooseItem(folder: TFolder): void {
+    this.onPick(folder.path);
+  }
+}
+
+export function openFolderPicker(
+  app: App,
+  onPick: (folder: string) => void,
+): void {
+  new FolderPickerModal(app, onPick).open();
 }

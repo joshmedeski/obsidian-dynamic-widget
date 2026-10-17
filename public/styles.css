@@ -1151,3 +1151,11 @@
   border: none;
   background-color: transparent;
 }
+
+.inbox-triage-heading {
+  cursor: pointer;
+}
+
+.inbox-triage-heading:hover {
+  color: var(--text-accent);
+}
