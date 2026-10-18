@@ -1,7 +1,7 @@
 import { ItemView, type TFile, type WorkspaceLeaf } from "obsidian";
 import { getChildAreas, getTopLevelAreas } from "./areas-hierarchy";
 import type DynamicWidgetPlugin from "./main";
-import { isFilePrivate, isValidHex, redactText } from "./utils";
+import { isFilePrivate, isValidHex, noteBullet, redactText } from "./utils";
 
 export const VIEW_TYPE_AREAS = "areas-view";
 
@@ -104,8 +104,11 @@ export class AreasView extends ItemView {
 
       const priority = metadata?.frontmatter?.priority;
       const name = isPrivate ? redactText(file.basename) : file.basename;
+      const icon = noteBullet(this.app, file);
       const displayName =
-        priority != null ? `${priority}. ${name}` : `${name} (No priority)`;
+        priority != null
+          ? `${priority}. ${icon} ${name}`
+          : `${icon} ${name} (No priority)`;
 
       const rawColor = metadata?.frontmatter?.color;
       const color =
@@ -158,9 +161,9 @@ export class AreasView extends ItemView {
         for (const child of children) {
           const childPrivate =
             this.plugin.privateMode && isFilePrivate(this.app, child);
-          const childName = childPrivate
-            ? redactText(child.basename)
-            : child.basename;
+          const childName = `${noteBullet(this.app, child)} ${
+            childPrivate ? redactText(child.basename) : child.basename
+          }`;
 
           const li = ul.createEl("li");
 
@@ -188,9 +191,9 @@ export class AreasView extends ItemView {
               const gc = grandchildren[i];
               const gcPrivate =
                 this.plugin.privateMode && isFilePrivate(this.app, gc);
-              const gcName = gcPrivate
-                ? redactText(gc.basename)
-                : gc.basename;
+              const gcName = `${noteBullet(this.app, gc)} ${
+                gcPrivate ? redactText(gc.basename) : gc.basename
+              }`;
 
               const gcLink = li.createEl("a", {
                 text: gcName,
