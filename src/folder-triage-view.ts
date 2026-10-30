@@ -29,6 +29,7 @@ import {
   normalizeAreasFrontmatter,
   onMiddleClick,
   openInTab,
+  resolveCoverFile,
   simplifyWikiLink,
 } from "./utils";
 
@@ -362,12 +363,25 @@ export class FolderTriageView extends ItemView {
 
   private renderProps(file: TFile): void {
     const frontmatter = this.app.metadataCache.getFileCache(file)?.frontmatter;
+    const cover =
+      this.plugin.privateMode && isFilePrivate(this.app, file)
+        ? null
+        : resolveCoverFile(this.app, frontmatter?.cover, file.path);
     const entries = Object.entries(frontmatter ?? {}).filter(
-      ([name]) => !HIDDEN_PROPS.has(name),
+      ([name]) => !HIDDEN_PROPS.has(name) && !(cover && name === "cover"),
     );
-    if (entries.length === 0) return;
+    if (entries.length === 0 && !cover) return;
 
-    const list = this.contentEl.createEl("dl", { cls: "inbox-triage-props" });
+    const details = this.contentEl.createEl("div", {
+      cls: "inbox-triage-details",
+    });
+    const list = details.createEl("dl", { cls: "inbox-triage-props" });
+    if (cover) {
+      details.createEl("img", {
+        cls: "inbox-triage-cover",
+        attr: { src: this.app.vault.getResourcePath(cover), alt: "" },
+      });
+    }
     for (const [name, value] of entries) {
       list.createEl("dt", { text: name });
       const dd = list.createEl("dd");

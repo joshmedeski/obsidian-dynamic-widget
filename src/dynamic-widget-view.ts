@@ -26,6 +26,7 @@ import {
   onMiddleClick,
   openInTab,
   redactText,
+  resolveCoverFile,
   simplifyWikiLink,
 } from "./utils";
 
@@ -695,7 +696,8 @@ export class DynamicWidgetView extends ItemView {
 
   private noteCoverFile(note: TFile): TFile | null {
     if (this.isNotePrivate(note)) return null;
-    return this.resolveCoverFile(
+    return resolveCoverFile(
+      this.app,
       this.app.metadataCache.getFileCache(note)?.frontmatter?.cover,
       note.path,
     );
@@ -772,29 +774,6 @@ export class DynamicWidgetView extends ItemView {
         if (event.key === "Enter" || event.key === " ") open(event);
       });
     }
-  }
-
-  private resolveCoverFile(cover: unknown, sourcePath: string): TFile | null {
-    if (typeof cover !== "string" || cover.length === 0) return null;
-    const cleanCover = cover.replace(/\[\[|\]\]/g, "");
-    const coverFile = this.app.metadataCache.getFirstLinkpathDest(
-      cleanCover,
-      sourcePath,
-    );
-    if (!coverFile) return null;
-    const imageExtensions = [
-      "jpg",
-      "jpeg",
-      "png",
-      "gif",
-      "bmp",
-      "svg",
-      "webp",
-      "avif",
-    ];
-    return imageExtensions.includes(coverFile.extension.toLowerCase())
-      ? coverFile
-      : null;
   }
 
   private makeUlLinkList(list: TFile[] | undefined): Element {

@@ -1086,6 +1086,26 @@
   grid-column: 1 / -1;
 }
 
+.inbox-triage-details {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.inbox-triage-details .inbox-triage-props {
+  flex: 1;
+  min-width: 0;
+}
+
+.inbox-triage-cover {
+  flex: none;
+  width: 160px;
+  max-height: 320px;
+  object-fit: cover;
+  border-radius: 6px;
+  border: 1px solid var(--background-modifier-border);
+}
+
 .inbox-triage-props {
   display: grid;
   grid-template-columns: max-content 1fr;

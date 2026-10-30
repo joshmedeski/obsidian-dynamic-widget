@@ -25,6 +25,32 @@ export function openInTab(app: App, file: TFile, background = false): void {
   void leaf.openFile(file, { active: !background });
 }
 
+const IMAGE_EXTENSIONS = new Set([
+  "jpg",
+  "jpeg",
+  "png",
+  "gif",
+  "bmp",
+  "svg",
+  "webp",
+  "avif",
+]);
+
+export function resolveCoverFile(
+  app: App,
+  cover: unknown,
+  sourcePath: string,
+): TFile | null {
+  if (typeof cover !== "string" || cover.length === 0) return null;
+  const coverFile = app.metadataCache.getFirstLinkpathDest(
+    cover.replace(/\[\[|\]\]/g, ""),
+    sourcePath,
+  );
+  return coverFile && IMAGE_EXTENSIONS.has(coverFile.extension.toLowerCase())
+    ? coverFile
+    : null;
+}
+
 export function onMiddleClick(el: HTMLElement, handler: () => void): void {
   el.addEventListener("mousedown", (event) => {
     if (event.button !== 1) return;
