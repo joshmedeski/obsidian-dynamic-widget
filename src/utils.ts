@@ -1,10 +1,37 @@
-import { type App, TFile } from "obsidian";
+import { type App, TFile, type WorkspaceLeaf } from "obsidian";
 
 /** Bullet shown for a list item whose note has no `icon` frontmatter. */
 export const DEFAULT_BULLET = "\u23FA\uFE0F";
 
 /** Bullet for a calendar event that has not been captured as a note yet. */
 export const DEFAULT_EVENT_BULLET = "\u{1F535}";
+
+type ConfigReader = { getConfig(key: string): unknown };
+
+function createBackgroundTab(app: App): WorkspaceLeaf {
+  const vault = app.vault as unknown as ConfigReader;
+  const getConfig = vault.getConfig;
+  vault.getConfig = (key) =>
+    key === "focusNewTab" ? false : getConfig.call(vault, key);
+  try {
+    return app.workspace.getLeaf("tab");
+  } finally {
+    vault.getConfig = getConfig;
+  }
+}
+
+export function openInTab(app: App, file: TFile, background = false): void {
+  const leaf = background ? createBackgroundTab(app) : app.workspace.getLeaf("tab");
+  void leaf.openFile(file, { active: !background });
+}
+
+export function onMiddleClick(el: HTMLElement, handler: () => void): void {
+  el.addEventListener("mousedown", (event) => {
+    if (event.button !== 1) return;
+    event.preventDefault();
+    handler();
+  });
+}
 
 export function normalizeAreasFrontmatter(
   areas: string | string[],

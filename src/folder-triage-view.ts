@@ -27,6 +27,8 @@ import {
   isValidHex,
   noteBullet,
   normalizeAreasFrontmatter,
+  onMiddleClick,
+  openInTab,
   simplifyWikiLink,
 } from "./utils";
 
@@ -282,6 +284,7 @@ export class FolderTriageView extends ItemView {
         this.render();
         this.focusView();
       });
+      onMiddleClick(linkEl, () => openInTab(this.app, file, true));
     });
 
     this.renderKeys(wrapper);

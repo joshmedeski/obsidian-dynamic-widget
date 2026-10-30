@@ -23,6 +23,8 @@ import {
   noteBullet,
   isValidHex,
   normalizeAreasFrontmatter,
+  onMiddleClick,
+  openInTab,
   redactText,
   simplifyWikiLink,
 } from "./utils";
@@ -631,6 +633,7 @@ export class DynamicWidgetView extends ItemView {
                   event.preventDefault();
                   this.app.workspace.getLeaf("tab").openFile(file);
                 });
+                onMiddleClick(cellEl, () => openInTab(this.app, file, true));
                 cellEl.addEventListener("keydown", (event) => {
                   if (event.key === "Enter" || event.key === " ") {
                     event.preventDefault();
@@ -764,6 +767,7 @@ export class DynamicWidgetView extends ItemView {
         this.app.workspace.getLeaf("tab").openFile(note);
       };
       cardEl.addEventListener("click", open);
+      onMiddleClick(cardEl, () => openInTab(this.app, note, true));
       cardEl.addEventListener("keydown", (event) => {
         if (event.key === "Enter" || event.key === " ") open(event);
       });
@@ -856,6 +860,7 @@ export class DynamicWidgetView extends ItemView {
             event.preventDefault();
             this.app.workspace.getLeaf("tab").openFile(note);
           });
+          onMiddleClick(linkEl, () => openInTab(this.app, note, true));
         }
 
         const deadline = metadata?.frontmatter?.deadline;
@@ -1036,12 +1041,13 @@ export class DynamicWidgetView extends ItemView {
         meta?.frontmatter?.title || file.basename,
       );
 
-      this.makeIconRow(ulEl, {
+      const isActive = activeFile?.path === file.path;
+      const { liEl } = this.makeIconRow(ulEl, {
         bullet: noteBullet(this.app, file, DEFAULT_EVENT_BULLET),
         title: label,
         description: formatEventNoteWhen(date, hasTime),
         descriptionCls: "calendar-event-meta",
-        isActive: activeFile?.path === file.path,
+        isActive,
         isPrivate: Boolean(
           this.plugin.privateMode && isFilePrivate(this.app, file),
         ),
@@ -1049,6 +1055,7 @@ export class DynamicWidgetView extends ItemView {
           this.app.workspace.getLeaf("tab").openFile(file);
         },
       });
+      if (!isActive) onMiddleClick(liEl, () => openInTab(this.app, file, true));
     }
     return ulEl;
   }
@@ -1666,6 +1673,7 @@ export class DynamicWidgetView extends ItemView {
       liEl.addEventListener("click", () => {
         this.openOrCreateEventNote(ev);
       });
+      onMiddleClick(liEl, () => this.openOrCreateEventNote(ev, true));
       liEl.addEventListener("keydown", (e) => {
         if (e.key === "Enter" || e.key === " ") {
           e.preventDefault();
@@ -1711,14 +1719,17 @@ export class DynamicWidgetView extends ItemView {
     );
   }
 
-  private async openOrCreateEventNote(event: CalendarEvent): Promise<void> {
+  private async openOrCreateEventNote(
+    event: CalendarEvent,
+    background = false,
+  ): Promise<void> {
     const existing = this.eventNoteFor(
       this.eventNotesByCalendarId(),
       event,
     );
 
     if (existing) {
-      this.app.workspace.getLeaf("tab").openFile(existing);
+      openInTab(this.app, existing, background);
       return;
     }
 
@@ -1739,7 +1750,7 @@ export class DynamicWidgetView extends ItemView {
     );
     try {
       const file = await this.app.vault.create(path, content);
-      this.app.workspace.getLeaf("tab").openFile(file);
+      openInTab(this.app, file, background);
     } catch (err) {
       console.error("Failed to create event note", err);
     }
