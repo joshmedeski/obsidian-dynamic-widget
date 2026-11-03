@@ -558,7 +558,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 12px;
+  font-size: 11px;
   line-height: 1;
   background-color: var(--background-primary);
   box-shadow: 0 0 0 1px var(--background-modifier-border);
@@ -1184,4 +1184,64 @@
 
 .inbox-triage-heading:hover {
   color: var(--text-accent);
+}
+
+.area-graph-view {
+  padding: 0;
+}
+
+.area-graph {
+  width: 100%;
+  height: 100%;
+}
+
+.area-graph g {
+  cursor: pointer;
+}
+
+.area-graph circle {
+  fill: var(--area-color, var(--interactive-accent));
+  stroke: var(--area-color, var(--interactive-accent));
+}
+
+.area-graph-container circle {
+  fill-opacity: 0.06;
+  stroke-opacity: 0.5;
+  stroke-dasharray: 4 3;
+}
+
+.area-graph-area circle {
+  fill-opacity: 0.35;
+  stroke-opacity: 0.9;
+}
+
+.area-graph-area:hover circle {
+  fill-opacity: 0.6;
+}
+
+.area-graph text {
+  fill: var(--text-normal);
+  text-anchor: middle;
+  dominant-baseline: middle;
+  pointer-events: none;
+  paint-order: stroke;
+  stroke: var(--background-primary);
+  stroke-width: 3px;
+}
+
+.area-graph-container text {
+  fill: var(--text-muted);
+  font-size: 11px;
+}
+
+.area-graph .area-graph-area {
+  transition: opacity 120ms ease;
+}
+
+.area-graph.is-focused .area-graph-area:not(.is-related) {
+  opacity: 0.15;
+}
+
+.area-graph.is-focused .area-graph-area.is-related circle {
+  fill-opacity: 0.7;
 }

@@ -4,9 +4,11 @@
   "scripts": {
     "dev": "vite build --watch --mode development",
     "build": "npm run check && vite build --mode production",
-    "check": "tsc -noEmit -skipLibCheck"
+    "check": "tsc -noEmit -skipLibCheck",
+    "test": "node --no-warnings scripts/check-area-graph.ts"
   },
   "devDependencies": {
+    "@types/d3-hierarchy": "^3.1.7",
     "@types/node": "20.19.4",
     "builtin-modules": "^5.0.0",
     "obsidian": "latest",
@@ -14,5 +16,8 @@
     "typescript": "^5.9.2",
     "vite": "^7.1.2",
     "vite-plugin-static-copy": "^3.1.1"
+  },
+  "dependencies": {
+    "d3-hierarchy": "^3.1.3"
   }
 }

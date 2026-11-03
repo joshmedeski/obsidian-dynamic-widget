@@ -12,11 +12,12 @@ protocol, and no shared build package. Everything this repo needs is in this rep
 | `npm run dev` | Vite in watch mode. Writes `build/` with inline sourcemaps, no minification, no type-check. |
 | `npm run check` | `tsc -noEmit -skipLibCheck` type-checks the TypeScript sources. No emit. |
 | `npm run build` | `npm run check` then a minified production bundle. This is the gate before committing. |
+| `npm test` | Runs `scripts/check-area-graph.ts`, an assert-based check of the area graph layout. |
 
 - `node_modules/` is gitignored; `package-lock.json` **is** committed.
 - `"private": true` — there is no `npm publish`. Obsidian's plugin loader is the only consumer.
 - Run `npm run build` before committing (it includes `npm run check`). CI runs the same chain.
-- There are no automated tests. Verify by hand in Obsidian — see `CONTRIBUTING.md`.
+- The only automated check is `npm test`, for `src/area-graph.ts`. Verify everything else by hand in Obsidian — see `CONTRIBUTING.md`.
 
 ## Layout
 
@@ -105,6 +106,18 @@ put `renderMedia` back inside the per-type renderers. Consequences:
   holds a **vault-relative** path (the Python CLI emitted an absolute one).
 - `loadAreas` reads `Areas/*.md` one level deep, via `metadataCache` rather
   than a hand-rolled YAML parser, so real frontmatter rules apply.
+
+## Area graph
+
+**Open Area Graph** packs the areas into nested circles with `d3-hierarchy`
+(the plugin's only runtime dependency): each area is a circle sized by its note
+count, inside a dashed container for its parent, so top-level areas never
+overlap. An area nests under its first `areas:` entry only, to any depth.
+Overlap is shown on hover instead: hovering an area dims everything that
+shares no notes with it. The layout lives in `src/area-graph.ts`, which imports
+nothing from `obsidian`. Private notes, private areas, and every area under a
+private ancestor are left out, whatever the private-mode toggle says. The
+layout is computed once when the view opens; it does not follow edits.
 
 ## Folder triage
 
