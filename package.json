@@ -8,7 +8,7 @@
     "test": "node --no-warnings scripts/check-area-graph.ts"
   },
   "devDependencies": {
-    "@types/d3-hierarchy": "^3.1.7",
+    "@types/d3-force": "^3.0.10",
     "@types/node": "20.19.4",
     "builtin-modules": "^5.0.0",
     "obsidian": "latest",
@@ -18,6 +18,6 @@
     "vite-plugin-static-copy": "^3.1.1"
   },
   "dependencies": {
-    "d3-hierarchy": "^3.1.3"
+    "d3-force": "^3.0.1"
   }
 }

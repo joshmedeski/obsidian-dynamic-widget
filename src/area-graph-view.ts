@@ -1,5 +1,12 @@
 import { ItemView, type TFile } from "obsidian";
-import { buildAreaGraph, layoutAreaGraph } from "./area-graph";
+import {
+  type Circle,
+  type Overlap,
+  buildAreaGraph,
+  labelFits,
+  labelPx,
+  layoutAreaGraph,
+} from "./area-graph";
 import { getAllAreaFiles } from "./areas-hierarchy";
 import {
   isFilePrivate,
@@ -13,8 +20,27 @@ import {
 export const VIEW_TYPE_AREA_GRAPH = "area-graph-view";
 
 const SVG_MARGIN = 20;
+const MIN_ZOOM = 1;
+const MAX_ZOOM = 30;
+const DRAG_THRESHOLD_PX = 4;
+
+const CONTAINER_LABEL_SCALE = 0.4;
+const CONTAINER_LABEL_INSET = 1.4;
+const CONTAINER_LABEL_FILL = 1.2;
+
+interface Label {
+  el: SVGTextElement;
+  circle: Circle;
+  widthPerPx: number;
+}
 
 export class AreaGraphView extends ItemView {
+  private updateViewport: () => void = () => {};
+
+  onResize(): void {
+    this.updateViewport();
+  }
+
   getViewType(): string {
     return VIEW_TYPE_AREA_GRAPH;
   }
@@ -69,8 +95,7 @@ export class AreaGraphView extends ItemView {
       notes,
     );
     const parentOf = new Map(graph.areas.map((a) => [a.name, a.parent]));
-    const countOf = new Map(graph.areas.map((a) => [a.name, a.count]));
-    const circles = layoutAreaGraph(graph);
+    const { circles, overlaps } = layoutAreaGraph(graph);
 
     const colorOf = (name: string): string | null => {
       const seen = new Set<string>();
@@ -82,6 +107,18 @@ export class AreaGraphView extends ItemView {
       }
       return null;
     };
+    const tint = (el: HTMLElement | SVGElement, name: string) => {
+      const color = colorOf(name);
+      if (color) el.style.setProperty("--area-color", color);
+    };
+
+    const legend = this.contentEl.createDiv({ cls: "area-graph-legend" });
+    for (const root of new Set(circles.map((c) => c.root))) {
+      const item = legend.createSpan({ cls: "area-graph-legend-item", text: root });
+      tint(item, root);
+      const file = fileByName.get(root);
+      if (file) item.addEventListener("click", () => openInTab(this.app, file));
+    }
 
     const minX = Math.min(...circles.map((c) => c.x - c.radius)) - SVG_MARGIN;
     const minY = Math.min(...circles.map((c) => c.y - c.radius)) - SVG_MARGIN;
@@ -92,47 +129,145 @@ export class AreaGraphView extends ItemView {
       cls: "area-graph",
       attr: { viewBox: `${minX} ${minY} ${maxX - minX} ${maxY - minY}` },
     });
+    const viewport = svg.createSvg("g");
+    const shapeLayer = viewport.createSvg("g");
+    const labelLayer = viewport.createSvg("g", { cls: "area-graph-labels" });
+    const labels: Label[] = [];
 
-    const groupsByName = new Map<string, SVGGElement[]>();
-    const highlight = (name: string | null) => {
-      svg.toggleClass("is-focused", name !== null);
-      for (const el of svg.querySelectorAll(".is-related")) el.removeClass("is-related");
-      if (name === null) return;
-      for (const n of [name, ...(graph.shared.get(name)?.keys() ?? [])]) {
-        for (const g of groupsByName.get(n) ?? []) g.addClass("is-related");
-      }
+    const areaGroups = new Map<string, SVGGElement>();
+    const highlight = (names: string[] | null) => {
+      svg.toggleClass("is-focused", names !== null);
+      for (const el of Array.from(svg.querySelectorAll(".is-related"))) el.removeClass("is-related");
+      for (const n of names ?? []) areaGroups.get(n)?.addClass("is-related");
     };
 
-    for (const c of circles) {
-      const g = svg.createSvg("g", {
+    const drawCircle = (c: Circle) => {
+      const g = shapeLayer.createSvg("g", {
         cls: c.container ? "area-graph-container" : "area-graph-area",
       });
-      groupsByName.set(c.name, [...(groupsByName.get(c.name) ?? []), g]);
-      const color = colorOf(c.name);
-      if (color) g.style.setProperty("--area-color", color);
-
-      const shared = graph.shared.get(c.name)?.size ?? 0;
-      g.createSvg("title").textContent = c.container
-        ? c.name
-        : `${c.name} · ${countOf.get(c.name) ?? 0} notes · shares notes with ${shared} areas`;
+      tint(g, c.name);
       g.createSvg("circle", { attr: { cx: c.x, cy: c.y, r: c.radius } });
-
-      const label = c.container
-        ? g.createSvg("text", { attr: { x: c.x, y: c.y - c.radius + 9 } })
-        : g.createSvg("text", {
-            attr: { x: c.x, y: c.y, "font-size": Math.min(16, Math.max(6, c.radius * 0.3)) },
-          });
+      const label = labelLayer.createSvg("text", { attr: { x: c.x, y: c.y } });
+      if (c.container) label.addClass("area-graph-container-label");
       label.textContent = c.name;
+      tint(label, c.name);
+      labels.push({ el: label, circle: c, widthPerPx: 0 });
 
-      if (!c.container) {
-        g.addEventListener("mouseenter", () => highlight(c.name));
+      if (c.container) {
+        g.createSvg("title").textContent = `${c.name} · ${c.count} notes across its areas`;
+      } else {
+        areaGroups.set(c.name, g);
+        const partners = graph.shared.get(c.name)?.size ?? 0;
+        g.createSvg("title").textContent = `${c.name} · ${c.count} notes · shares notes with ${partners} areas`;
+        g.addEventListener("mouseenter", () =>
+          highlight([c.name, ...(graph.shared.get(c.name)?.keys() ?? [])]),
+        );
         g.addEventListener("mouseleave", () => highlight(null));
       }
 
       const file = fileByName.get(c.name);
-      if (!file) continue;
+      if (!file) return;
       g.addEventListener("click", () => openInTab(this.app, file));
       onMiddleClick(g, () => openInTab(this.app, file, true));
+    };
+
+    const drawOverlap = (o: Overlap) => {
+      const lens = shapeLayer.createSvg("path", {
+        cls: o.a.container || o.b.container ? ["area-graph-overlap", "is-container"] : "area-graph-overlap",
+        attr: { d: o.path },
+      });
+      lens.createSvg("title").textContent =
+        `${o.a.name} ∩ ${o.b.name} · ${o.shared} ${o.shared === 1 ? "note" : "notes"}`;
+      lens.addEventListener("mouseenter", () => highlight([o.a.name, o.b.name]));
+      lens.addEventListener("mouseleave", () => highlight(null));
+    };
+
+    const maxDepth = Math.max(...circles.map((c) => c.depth));
+    for (let depth = 0; depth <= maxDepth; depth++) {
+      for (const c of circles) if (c.depth === depth) drawCircle(c);
+      for (const o of overlaps) if (o.depth === depth) drawOverlap(o);
     }
+
+    let zoom = { k: 1, x: 0, y: 0 };
+    const layoutToScreen = () => {
+      const box = svg.viewBox.baseVal;
+      const rect = svg.getBoundingClientRect();
+      return Math.min(rect.width / box.width, rect.height / box.height);
+    };
+    const measure = (label: Label) => {
+      label.el.setAttr("font-size", 100);
+      label.widthPerPx = label.el.getComputedTextLength() / 100;
+    };
+
+    this.updateViewport = () => {
+      viewport.setAttr("transform", `translate(${zoom.x} ${zoom.y}) scale(${zoom.k})`);
+      const scale = layoutToScreen() * zoom.k;
+      if (!scale) return;
+      for (const label of labels) {
+        if (!label.widthPerPx) measure(label);
+        const { container, y, radius } = label.circle;
+        const radiusPx = radius * scale;
+        const sizePx = container ? labelPx(radiusPx * CONTAINER_LABEL_SCALE) : labelPx(radiusPx);
+        label.el.setAttr("font-size", sizePx / scale);
+        if (container) label.el.setAttr("y", y - radius + (sizePx * CONTAINER_LABEL_INSET) / scale);
+        const fits = container
+          ? label.widthPerPx * sizePx <= CONTAINER_LABEL_FILL * radiusPx
+          : labelFits(label.widthPerPx, radiusPx);
+        label.el.toggleClass("is-hidden", !fits);
+      }
+    };
+
+    const toLayout = (e: MouseEvent) =>
+      new DOMPoint(e.clientX, e.clientY).matrixTransform(svg.getScreenCTM()?.inverse());
+
+    svg.addEventListener(
+      "wheel",
+      (e) => {
+        e.preventDefault();
+        const p = toLayout(e);
+        const k = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, zoom.k * Math.exp(-e.deltaY * 0.002)));
+        zoom = { k, x: p.x - ((p.x - zoom.x) * k) / zoom.k, y: p.y - ((p.y - zoom.y) * k) / zoom.k };
+        this.updateViewport();
+      },
+      { passive: false },
+    );
+
+    let drag: { x: number; y: number; moved: boolean } | null = null;
+    let suppressClick = false;
+    svg.addEventListener("pointerdown", (e) => {
+      if (e.button !== 0) return;
+      drag = { x: e.clientX, y: e.clientY, moved: false };
+      suppressClick = false;
+    });
+    svg.addEventListener("pointermove", (e) => {
+      if (!drag) return;
+      const dx = e.clientX - drag.x;
+      const dy = e.clientY - drag.y;
+      if (!drag.moved && Math.hypot(dx, dy) < DRAG_THRESHOLD_PX) return;
+      if (!drag.moved) svg.setPointerCapture(e.pointerId);
+      drag = { x: e.clientX, y: e.clientY, moved: true };
+      const toLayoutUnits = layoutToScreen();
+      zoom = { ...zoom, x: zoom.x + dx / toLayoutUnits, y: zoom.y + dy / toLayoutUnits };
+      svg.addClass("is-panning");
+      this.updateViewport();
+    });
+    svg.addEventListener("pointerup", () => {
+      suppressClick = drag?.moved ?? false;
+      drag = null;
+      svg.removeClass("is-panning");
+    });
+    svg.addEventListener(
+      "click",
+      (e) => {
+        if (suppressClick) e.stopPropagation();
+      },
+      true,
+    );
+    svg.addEventListener("dblclick", () => {
+      zoom = { k: 1, x: 0, y: 0 };
+      this.updateViewport();
+    });
+
+    this.updateViewport();
   }
 }

@@ -1187,39 +1187,113 @@
 }
 
 .area-graph-view {
+  position: relative;
   padding: 0;
+}
+
+.area-graph-legend {
+  position: absolute;
+  top: var(--size-4-3);
+  left: var(--size-4-3);
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--size-4-2) var(--size-4-4);
+  font-size: var(--font-ui-small);
+}
+
+.area-graph-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--size-4-1);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.area-graph-legend-item::before {
+  content: "";
+  width: 0.75em;
+  height: 0.75em;
+  border-radius: 50%;
+  background: var(--area-color, var(--interactive-accent));
+}
+
+.area-graph-legend-item:hover {
+  color: var(--text-normal);
 }
 
 .area-graph {
   width: 100%;
   height: 100%;
+  cursor: grab;
+  touch-action: none;
 }
 
-.area-graph g {
+.area-graph.is-panning {
+  cursor: grabbing;
+}
+
+.area-graph circle,
+.area-graph path,
+.area-graph text {
+  vector-effect: non-scaling-stroke;
+}
+
+.area-graph-area {
   cursor: pointer;
-}
-
-.area-graph circle {
-  fill: var(--area-color, var(--interactive-accent));
-  stroke: var(--area-color, var(--interactive-accent));
-}
-
-.area-graph-container circle {
-  fill-opacity: 0.06;
-  stroke-opacity: 0.5;
-  stroke-dasharray: 4 3;
+  transition: opacity 120ms ease;
 }
 
 .area-graph-area circle {
-  fill-opacity: 0.35;
+  fill: var(--area-color, var(--interactive-accent));
+  fill-opacity: 0.25;
+  stroke: var(--area-color, var(--interactive-accent));
   stroke-opacity: 0.9;
 }
 
 .area-graph-area:hover circle {
-  fill-opacity: 0.6;
+  fill-opacity: 0.45;
 }
 
-.area-graph text {
+.area-graph-container circle {
+  fill: var(--area-color, var(--interactive-accent));
+  fill-opacity: 0.05;
+  stroke: var(--area-color, var(--interactive-accent));
+  stroke-opacity: 0.6;
+  stroke-dasharray: 6 4;
+}
+
+.area-graph-container {
+  cursor: pointer;
+}
+
+.area-graph-container:hover circle {
+  fill-opacity: 0.1;
+  stroke-opacity: 1;
+}
+
+.area-graph-overlap {
+  fill: var(--text-normal);
+  fill-opacity: 0.12;
+  stroke: var(--text-normal);
+  stroke-opacity: 0.35;
+  cursor: help;
+}
+
+.area-graph-overlap.is-container {
+  fill-opacity: 0.03;
+  stroke-opacity: 0.25;
+}
+
+.area-graph-overlap:hover {
+  fill-opacity: 0.4;
+  stroke-opacity: 0.9;
+}
+
+.area-graph.is-focused .area-graph-area:not(.is-related) {
+  opacity: 0.15;
+}
+
+.area-graph-labels text {
   fill: var(--text-normal);
   text-anchor: middle;
   dominant-baseline: middle;
@@ -1229,19 +1303,11 @@
   stroke-width: 3px;
 }
 
-.area-graph-container text {
-  fill: var(--text-muted);
-  font-size: 11px;
+.area-graph-labels .area-graph-container-label {
+  fill: var(--area-color, var(--text-muted));
+  dominant-baseline: auto;
 }
 
-.area-graph .area-graph-area {
-  transition: opacity 120ms ease;
-}
-
-.area-graph.is-focused .area-graph-area:not(.is-related) {
-  opacity: 0.15;
-}
-
-.area-graph.is-focused .area-graph-area.is-related circle {
-  fill-opacity: 0.7;
+.area-graph-labels text.is-hidden {
+  display: none;
 }

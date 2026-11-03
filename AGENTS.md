@@ -109,13 +109,28 @@ put `renderMedia` back inside the per-type renderers. Consequences:
 
 ## Area graph
 
-**Open Area Graph** packs the areas into nested circles with `d3-hierarchy`
-(the plugin's only runtime dependency): each area is a circle sized by its note
-count, inside a dashed container for its parent, so top-level areas never
-overlap. An area nests under its first `areas:` entry only, to any depth.
-Overlap is shown on hover instead: hovering an area dims everything that
-shares no notes with it. The layout lives in `src/area-graph.ts`, which imports
-nothing from `obsidian`. Private notes, private areas, and every area under a
+**Open Area Graph** nests every area inside its parent (first `areas:` entry,
+any depth) and makes each level a Venn diagram. A parent is a dashed container;
+its own notes are a solid circle inside it next to its children. Leaf circles
+have area proportional to note count. Siblings whose subtrees share at least
+`MIN_SHARED_FOR_OVERLAP` notes overlap, the lens covering the same fraction of
+the smaller circle as the shared notes are of its subtree, and the lens is
+hoverable with the count. Colours come from each area's own or nearest
+ancestor's `color`.
+
+The layout in `src/area-graph.ts` (no `obsidian` import, checked by `npm test`)
+runs bottom-up: lay out each parent's children with `d3-force`, wrap them in a
+tight enclosing circle, repeat one level up. Two rules keep it honest, and both
+cost overlap depth on purpose: a pair never overlaps deeper than its shared
+notes earn, and two overlapping containers are pushed apart until nothing
+*inside* them touches, so only parent outlines ever cross. Leaf circles overlap
+only when they are siblings that share notes.
+
+Labels are sized in screen pixels and hidden unless they fit inside their
+circle; scroll zooms (around the cursor), drag pans, double-click resets, and
+labels reappear as circles grow. Hovering a circle still highlights every area
+it shares any note with, since cross-branch sharing between leaves only shows
+as overlapping containers. Private notes, private areas, and every area under a
 private ancestor are left out, whatever the private-mode toggle says. The
 layout is computed once when the view opens; it does not follow edits.
 
