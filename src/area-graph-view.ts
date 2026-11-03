@@ -10,6 +10,7 @@ import {
 import { getAllAreaFiles } from "./areas-hierarchy";
 import {
   isFilePrivate,
+  resolveCoverFile,
   isValidHex,
   normalizeAreasFrontmatter,
   onMiddleClick,
@@ -129,6 +130,16 @@ export class AreaGraphView extends ItemView {
       cls: "area-graph",
       attr: { viewBox: `${minX} ${minY} ${maxX - minX} ${maxY - minY}` },
     });
+    const defs = svg.createSvg("defs");
+    const clipPrefix = `area-graph-clip-${Math.random().toString(36).slice(2)}`;
+    const containerNames = new Set(circles.filter((c) => c.container).map((c) => c.name));
+    const wallpaperOf = (c: Circle) => {
+      const file = fileByName.get(c.name);
+      if (!file || (!c.container && containerNames.has(c.name))) return null;
+      const raw = this.app.metadataCache.getFileCache(file)?.frontmatter?.wallpaper;
+      const image = resolveCoverFile(this.app, raw, file.path);
+      return image ? this.app.vault.getResourcePath(image) : null;
+    };
     const viewport = svg.createSvg("g");
     const shapeLayer = viewport.createSvg("g");
     const labelLayer = viewport.createSvg("g", { cls: "area-graph-labels" });
@@ -146,6 +157,25 @@ export class AreaGraphView extends ItemView {
         cls: c.container ? "area-graph-container" : "area-graph-area",
       });
       tint(g, c.name);
+      const wallpaper = wallpaperOf(c);
+      if (wallpaper) {
+        const clipId = `${clipPrefix}-${defs.childElementCount}`;
+        defs
+          .createSvg("clipPath", { attr: { id: clipId } })
+          .createSvg("circle", { attr: { cx: c.x, cy: c.y, r: c.radius } });
+        g.createSvg("image", {
+          attr: {
+            href: wallpaper,
+            x: c.x - c.radius,
+            y: c.y - c.radius,
+            width: 2 * c.radius,
+            height: 2 * c.radius,
+            preserveAspectRatio: "xMidYMid slice",
+            "clip-path": `url(#${clipId})`,
+          },
+        });
+        g.addClass("has-wallpaper");
+      }
       g.createSvg("circle", { attr: { cx: c.x, cy: c.y, r: c.radius } });
       const label = labelLayer.createSvg("text", { attr: { x: c.x, y: c.y } });
       if (c.container) label.addClass("area-graph-container-label");

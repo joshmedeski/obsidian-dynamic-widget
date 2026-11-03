@@ -1271,6 +1271,28 @@
   stroke-opacity: 1;
 }
 
+.area-graph image {
+  pointer-events: none;
+}
+
+.area-graph .has-wallpaper circle {
+  fill: var(--background-primary);
+  fill-opacity: 0.55;
+  transition: fill-opacity 160ms ease;
+}
+
+.area-graph .area-graph-container.has-wallpaper circle {
+  fill-opacity: 0.75;
+}
+
+.area-graph .has-wallpaper:hover circle {
+  fill-opacity: 0.25;
+}
+
+.area-graph .area-graph-container.has-wallpaper:hover circle {
+  fill-opacity: 0.5;
+}
+
 .area-graph-overlap {
   fill: var(--text-normal);
   fill-opacity: 0.12;
