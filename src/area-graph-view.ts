@@ -6,6 +6,7 @@ import {
   labelFits,
   labelPx,
   layoutAreaGraph,
+  placeLabels,
 } from "./area-graph";
 import { getAllAreaFiles } from "./areas-hierarchy";
 import {
@@ -28,6 +29,7 @@ const DRAG_THRESHOLD_PX = 4;
 const CONTAINER_LABEL_SCALE = 0.4;
 const CONTAINER_LABEL_INSET = 1.4;
 const CONTAINER_LABEL_FILL = 1.2;
+const LABEL_GAP_PX = 12;
 
 interface Label {
   el: SVGTextElement;
@@ -132,10 +134,9 @@ export class AreaGraphView extends ItemView {
     });
     const defs = svg.createSvg("defs");
     const clipPrefix = `area-graph-clip-${Math.random().toString(36).slice(2)}`;
-    const containerNames = new Set(circles.filter((c) => c.container).map((c) => c.name));
     const wallpaperOf = (c: Circle) => {
       const file = fileByName.get(c.name);
-      if (!file || (!c.container && containerNames.has(c.name))) return null;
+      if (!file) return null;
       const raw = this.app.metadataCache.getFileCache(file)?.frontmatter?.wallpaper;
       const image = resolveCoverFile(this.app, raw, file.path);
       return image ? this.app.vault.getResourcePath(image) : null;
@@ -183,15 +184,13 @@ export class AreaGraphView extends ItemView {
       tint(label, c.name);
       labels.push({ el: label, circle: c, widthPerPx: 0 });
 
-      if (c.container) {
-        g.createSvg("title").textContent = `${c.name} · ${c.count} notes across its areas`;
-      } else {
+      const partners = graph.shared.get(c.name)?.size ?? 0;
+      g.createSvg("title").textContent = c.container
+        ? `${c.name} · ${c.own} own notes · ${c.count} total · shares notes with ${partners} areas`
+        : `${c.name} · ${c.count} notes · shares notes with ${partners} areas`;
+      if (!c.container) {
         areaGroups.set(c.name, g);
-        const partners = graph.shared.get(c.name)?.size ?? 0;
-        g.createSvg("title").textContent = `${c.name} · ${c.count} notes · shares notes with ${partners} areas`;
-        g.addEventListener("mouseenter", () =>
-          highlight([c.name, ...(graph.shared.get(c.name)?.keys() ?? [])]),
-        );
+        g.addEventListener("mouseenter", () => highlight([c.name, ...(graph.shared.get(c.name)?.keys() ?? [])]));
         g.addEventListener("mouseleave", () => highlight(null));
       }
 
@@ -229,22 +228,30 @@ export class AreaGraphView extends ItemView {
       label.widthPerPx = label.el.getComputedTextLength() / 100;
     };
 
+    labels.sort((a, b) => a.circle.depth - b.circle.depth || b.circle.radius - a.circle.radius);
+
     this.updateViewport = () => {
       viewport.setAttr("transform", `translate(${zoom.x} ${zoom.y}) scale(${zoom.k})`);
       const scale = layoutToScreen() * zoom.k;
       if (!scale) return;
-      for (const label of labels) {
+      const boxes = labels.map((label) => {
         if (!label.widthPerPx) measure(label);
-        const { container, y, radius } = label.circle;
+        const { container, x, y, radius } = label.circle;
         const radiusPx = radius * scale;
         const sizePx = container ? labelPx(radiusPx * CONTAINER_LABEL_SCALE) : labelPx(radiusPx);
-        label.el.setAttr("font-size", sizePx / scale);
-        if (container) label.el.setAttr("y", y - radius + (sizePx * CONTAINER_LABEL_INSET) / scale);
+        const size = sizePx / scale;
+        const top = container ? y - radius + size * CONTAINER_LABEL_INSET : y;
+        label.el.setAttr("font-size", size);
+        if (container) label.el.setAttr("y", top);
         const fits = container
           ? label.widthPerPx * sizePx <= CONTAINER_LABEL_FILL * radiusPx
           : labelFits(label.widthPerPx, radiusPx);
-        label.el.toggleClass("is-hidden", !fits);
-      }
+        if (!fits) return null;
+        const width = label.widthPerPx * size;
+        return { x: x - width / 2, y: container ? top - size : top - size / 2, width, height: size };
+      });
+      const shown = placeLabels(boxes, LABEL_GAP_PX / scale);
+      labels.forEach((label, i) => label.el.toggleClass("is-hidden", !shown[i]));
     };
 
     const toLayout = (e: MouseEvent) =>

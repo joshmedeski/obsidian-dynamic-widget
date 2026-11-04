@@ -32,6 +32,7 @@ export interface Circle {
   container: boolean;
   depth: number;
   count: number;
+  own: number;
   x: number;
   y: number;
   radius: number;
@@ -326,6 +327,7 @@ export function layoutAreaGraph(graph: AreaGraph): AreaLayout {
       container: false,
       depth,
       count: notes.size,
+      own: notes.size,
       x: 0,
       y: 0,
       radius,
@@ -340,13 +342,12 @@ export function layoutAreaGraph(graph: AreaGraph): AreaLayout {
       .filter((item): item is Item => item !== null);
     if (kids.length === 0) return direct.size > 0 ? leaf(area, depth, direct) : null;
 
-    const items = [...(direct.size > 0 ? [leaf(area, depth + 1, direct)] : []), ...kids];
-    placeSiblings(items, depth + 1, overlaps);
-    for (const item of items) translate(item.circles, item.x, item.y);
+    placeSiblings(kids, depth + 1, overlaps);
+    for (const kid of kids) translate(kid.circles, kid.x, kid.y);
 
-    const { cx, cy, radius: enclosing } = enclose(items);
-    const radius = enclosing + CONTAINER_PADDING;
-    const inner = items.flatMap((i) => i.circles);
+    const { cx, cy, radius: enclosing } = enclose(kids);
+    const radius = Math.hypot(enclosing + CONTAINER_PADDING, RADIUS_PER_SQRT_NOTE * Math.sqrt(direct.size));
+    const inner = kids.flatMap((i) => i.circles);
     translate(inner, -cx, -cy);
 
     const notes = new Set<number>(direct);
@@ -357,6 +358,7 @@ export function layoutAreaGraph(graph: AreaGraph): AreaLayout {
       container: true,
       depth,
       count: notes.size,
+      own: direct.size,
       x: 0,
       y: 0,
       radius,
@@ -389,4 +391,27 @@ export function labelPx(radiusPx: number): number {
 
 export function labelFits(widthPerPx: number, radiusPx: number, fill = LABEL_FILL): boolean {
   return widthPerPx * labelPx(radiusPx) <= fill * radiusPx;
+}
+
+export interface Box {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export function placeLabels(boxes: (Box | null)[], gap: number): boolean[] {
+  const placed: Box[] = [];
+  return boxes.map((b) => {
+    if (!b) return false;
+    const clear = placed.every(
+      (p) =>
+        b.x + b.width + gap <= p.x ||
+        p.x + p.width + gap <= b.x ||
+        b.y + b.height + gap <= p.y ||
+        p.y + p.height + gap <= b.y,
+    );
+    if (clear) placed.push(b);
+    return clear;
+  });
 }

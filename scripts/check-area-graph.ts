@@ -7,6 +7,7 @@ import {
   labelFits,
   labelPx,
   layoutAreaGraph,
+  placeLabels,
 } from "../src/area-graph.ts";
 
 const inputs = [
@@ -65,10 +66,13 @@ const inside = (inner: { x: number; y: number; radius: number }, outer: typeof i
   Math.hypot(inner.x - outer.x, inner.y - outer.y) + inner.radius <= outer.radius + 1e-6;
 
 assert.ok(container("Life") && container("Home") && container("Leisure"));
-assert.ok(area("Life"), "a parent's own notes get a circle inside it");
-assert.ok(inside(area("Life"), container("Life")));
+assert.ok(!area("Life") && !area("Home"), "a parent is only its container");
+assert.equal(container("Home").own, 18);
+assert.ok(
+  container("Home").radius > Math.hypot(area("Garden").radius + 14, 4 * Math.sqrt(18)) - 1e-6,
+  "a container makes room for its own notes",
+);
 assert.ok(inside(container("Home"), container("Life")));
-assert.ok(inside(area("Home"), container("Home")));
 assert.ok(inside(area("Garden"), container("Home")));
 assert.ok(inside(area("Garden"), container("Life")));
 assert.ok(inside(area("Car"), container("Life")));
@@ -97,3 +101,7 @@ assert.equal(labelPx(1000), 22);
 assert.ok(labelFits(0.6, 40), "a 6-char label fits a 40px circle");
 assert.ok(!labelFits(0.6 * 4, 10), "a long label hides in a 10px circle");
 console.log("labels ok");
+
+const box = (x: number, y: number) => ({ x, y, width: 10, height: 4 });
+assert.deepEqual(placeLabels([box(0, 0), box(5, 2), null, box(0, 8), box(0, 5)], 2), [true, false, false, true, false]);
+console.log("label placement ok");

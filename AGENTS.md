@@ -111,8 +111,9 @@ put `renderMedia` back inside the per-type renderers. Consequences:
 
 **Open Area Graph** nests every area inside its parent (first `areas:` entry,
 any depth) and makes each level a Venn diagram. A parent is a dashed container;
-its own notes are a solid circle inside it next to its children. Leaf circles
-have area proportional to note count. Siblings whose subtrees share at least
+it gets extra room equal in area to its own notes, so the space its children
+leave empty stands for the notes filed directly under it. Leaf circles have
+area proportional to note count. Siblings whose subtrees share at least
 `MIN_SHARED_FOR_OVERLAP` notes overlap, the lens covering the same fraction of
 the smaller circle as the shared notes are of its subtree, and the lens is
 hoverable with the count. Colours come from each area's own or nearest
