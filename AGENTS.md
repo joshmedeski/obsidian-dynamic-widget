@@ -12,11 +12,12 @@ protocol, and no shared build package. Everything this repo needs is in this rep
 | `npm run dev` | Vite in watch mode. Writes `build/` with inline sourcemaps, no minification, no type-check. |
 | `npm run check` | `tsc -noEmit -skipLibCheck` type-checks the TypeScript sources. No emit. |
 | `npm run build` | `npm run check` then a minified production bundle. This is the gate before committing. |
+| `npm test` | Runs `scripts/check-area-graph.ts`, an assert-based check of the area graph layout. |
 
 - `node_modules/` is gitignored; `package-lock.json` **is** committed.
 - `"private": true` — there is no `npm publish`. Obsidian's plugin loader is the only consumer.
 - Run `npm run build` before committing (it includes `npm run check`). CI runs the same chain.
-- There are no automated tests. Verify by hand in Obsidian — see `CONTRIBUTING.md`.
+- The only automated check is `npm test`, for `src/area-graph.ts`. Verify everything else by hand in Obsidian — see `CONTRIBUTING.md`.
 
 ## Layout
 
@@ -105,6 +106,34 @@ put `renderMedia` back inside the per-type renderers. Consequences:
   holds a **vault-relative** path (the Python CLI emitted an absolute one).
 - `loadAreas` reads `Areas/*.md` one level deep, via `metadataCache` rather
   than a hand-rolled YAML parser, so real frontmatter rules apply.
+
+## Area graph
+
+**Open Area Graph** nests every area inside its parent (first `areas:` entry,
+any depth) and makes each level a Venn diagram. A parent is a dashed container;
+it gets extra room equal in area to its own notes, so the space its children
+leave empty stands for the notes filed directly under it. Leaf circles have
+area proportional to note count. Siblings whose subtrees share at least
+`MIN_SHARED_FOR_OVERLAP` notes overlap, the lens covering the same fraction of
+the smaller circle as the shared notes are of its subtree, and the lens is
+hoverable with the count. Colours come from each area's own or nearest
+ancestor's `color`.
+
+The layout in `src/area-graph.ts` (no `obsidian` import, checked by `npm test`)
+runs bottom-up: lay out each parent's children with `d3-force`, wrap them in a
+tight enclosing circle, repeat one level up. Two rules keep it honest, and both
+cost overlap depth on purpose: a pair never overlaps deeper than its shared
+notes earn, and two overlapping containers are pushed apart until nothing
+*inside* them touches, so only parent outlines ever cross. Leaf circles overlap
+only when they are siblings that share notes.
+
+Labels are sized in screen pixels and hidden unless they fit inside their
+circle; scroll zooms (around the cursor), drag pans, double-click resets, and
+labels reappear as circles grow. Hovering a circle still highlights every area
+it shares any note with, since cross-branch sharing between leaves only shows
+as overlapping containers. Private notes, private areas, and every area under a
+private ancestor are left out, whatever the private-mode toggle says. The
+layout is computed once when the view opens; it does not follow edits.
 
 ## Folder triage
 

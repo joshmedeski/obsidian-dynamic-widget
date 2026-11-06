@@ -266,12 +266,10 @@ export class FolderTriageView extends ItemView {
         this.app.metadataCache.getFileCache(file)?.frontmatter?.title ||
         file.basename;
       if (file === current) {
-        itemEl
-          .createEl("span", {
-            text: `\u{1F449} ${title}`,
-            cls: "dynamic-widget-active-file",
-          })
-          .scrollIntoView({ block: "nearest" });
+        itemEl.createEl("span", {
+          text: `\u{1F449} ${title}`,
+          cls: "dynamic-widget-active-file",
+        });
         return;
       }
 
@@ -289,6 +287,9 @@ export class FolderTriageView extends ItemView {
     });
 
     this.renderKeys(wrapper);
+    wrapper
+      .querySelector(".dynamic-widget-active-file")
+      ?.scrollIntoView({ block: "center" });
   }
 
   private areaPriority(area: string): string | null {

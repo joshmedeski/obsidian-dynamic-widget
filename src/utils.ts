@@ -51,8 +51,8 @@ export function resolveCoverFile(
     : null;
 }
 
-export function onMiddleClick(el: HTMLElement, handler: () => void): void {
-  el.addEventListener("mousedown", (event) => {
+export function onMiddleClick(el: HTMLElement | SVGElement, handler: () => void): void {
+  el.addEventListener("mousedown", (event: MouseEvent) => {
     if (event.button !== 1) return;
     event.preventDefault();
     handler();
@@ -105,10 +105,8 @@ export function isFilePrivate(app: App, file: TFile): boolean {
   if (!areas?.length) return false;
   for (const area of areas) {
     const areaName = simplifyWikiLink(area);
-    const areaFile = app.vault
-      .getFiles()
-      .find((f) => f.path === `Areas/${areaName}.md`);
-    if (!areaFile) continue;
+    const areaFile = app.vault.getAbstractFileByPath(`Areas/${areaName}.md`);
+    if (!(areaFile instanceof TFile)) continue;
     const areaMeta = app.metadataCache.getFileCache(areaFile);
     if (areaMeta?.frontmatter?.private === true) return true;
   }

@@ -1,5 +1,6 @@
 import { MarkdownView, Plugin, type TFile } from 'obsidian';
 
+import { AreaGraphView, VIEW_TYPE_AREA_GRAPH } from './area-graph-view';
 import { AreaTableView, VIEW_TYPE_AREA_TABLE } from './area-table-view';
 import { AreaTriageView, VIEW_TYPE_AREA_TRIAGE } from './area-triage-view';
 import { AreasView, VIEW_TYPE_AREAS } from './areas-view';
@@ -74,6 +75,11 @@ export default class DynamicWidgetPlugin extends Plugin {
       (leaf) => new AreaTableView(leaf, this)
     );
 
+    this.registerView(
+      VIEW_TYPE_AREA_GRAPH,
+      (leaf) => new AreaGraphView(leaf)
+    );
+
     // Register the someday maybe view
     this.registerView(
       VIEW_TYPE_SOMEDAY_MAYBE,
@@ -145,6 +151,14 @@ export default class DynamicWidgetPlugin extends Plugin {
       name: 'Open Area Table',
       callback: () => {
         this.activateAreaTableView();
+      },
+    });
+
+    this.addCommand({
+      id: 'open-area-graph-view',
+      name: 'Open Area Graph',
+      callback: () => {
+        this.activateAreaGraphView();
       },
     });
 
@@ -313,6 +327,15 @@ export default class DynamicWidgetPlugin extends Plugin {
     const leaf = this.app.workspace.getLeaf('tab');
     await leaf.setViewState({
       type: VIEW_TYPE_AREA_TABLE,
+      active: true,
+    });
+    this.app.workspace.revealLeaf(leaf);
+  }
+
+  async activateAreaGraphView() {
+    const leaf = this.app.workspace.getLeaf('tab');
+    await leaf.setViewState({
+      type: VIEW_TYPE_AREA_GRAPH,
       active: true,
     });
     this.app.workspace.revealLeaf(leaf);
