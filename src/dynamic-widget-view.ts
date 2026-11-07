@@ -1,4 +1,11 @@
-import { type App, ItemView, Notice, TFile, type WorkspaceLeaf } from "obsidian";
+import {
+  type App,
+  ItemView,
+  Notice,
+  setIcon,
+  TFile,
+  type WorkspaceLeaf,
+} from "obsidian";
 import { collectAreaNames, getAreaHierarchy } from "./areas-hierarchy";
 import {
   type AreaSuggestion,
@@ -7,7 +14,7 @@ import {
   suggestAreas,
 } from "./area-suggestion";
 import { type CalendarEvent, fetchEventsForDate } from "./calendar";
-import { FolderTriageView } from "./folder-triage-view";
+import { areaOrder, FolderTriageView, rankOf } from "./folder-triage-view";
 import type DynamicWidgetPlugin from "./main";
 import {
   areaIcon,
@@ -34,6 +41,28 @@ export const VIEW_TYPE_DYNAMIC_WIDGET = "dynamic-widget-view";
 /** Where a newly captured calendar event is written. */
 const EVENT_NOTES_DIR = "Events";
 const dayFileNameRegex = /^\d{4}-\d{2}-\d{2}$/;
+
+function formatDayNoteTitle(basename: string): string {
+  const [year, month, day] = basename.split("-").map(Number);
+  const date = new Date(year, month - 1, day);
+  const label = date.toLocaleDateString("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+  const now = new Date();
+  const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+  if (isSameLocalDay(date, now)) return `${label} (today)`;
+  if (isSameLocalDay(date, yesterday)) return `${label} (yesterday)`;
+  return label;
+}
+
+function skillTitle(file: TFile): string | undefined {
+  if (file.basename !== "SKILL" || !file.parent?.name) return undefined;
+  const words = `${file.parent.name} skill`.split(/[\s_-]+/);
+  return words.map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+}
 
 function formatEventClock(date: Date): { time: string; meridiem: string } {
   const hours = date.getHours();
@@ -776,6 +805,75 @@ export class DynamicWidgetView extends ItemView {
     }
   }
 
+  private deadlineLabel(note: TFile): string | undefined {
+    const deadline =
+      this.app.metadataCache.getFileCache(note)?.frontmatter?.deadline;
+    if (deadline == null || note.path.startsWith("Archives/")) return undefined;
+    return formatRelativeDeadline(deadline) || undefined;
+  }
+
+  private renderOpenTabs(): void {
+    const current = this.app.workspace.getMostRecentLeaf();
+    const sectionEl = this.contentEl.createEl("section");
+    sectionEl.createEl("h3", { text: "🗂️ Tabs" });
+    const ulEl = sectionEl.createEl("ul", { cls: "dw-list dw-tabs" });
+
+    const tabs: { leaf: WorkspaceLeaf; file: TFile | null }[] = [];
+    this.app.workspace.iterateRootLeaves((leaf) => {
+      const path = leaf.getViewState().state?.file;
+      const file =
+        typeof path === "string" ? this.app.vault.getFileByPath(path) : null;
+      tabs.push({ leaf, file });
+    });
+
+    const order = areaOrder(this.app);
+    const isDay = (file: TFile | null) =>
+      !!file && dayFileNameRegex.test(file.basename);
+    const rank = (file: TFile | null) =>
+      file ? rankOf(this.app, file, order).rank : Infinity;
+    tabs.sort(
+      (a, b) =>
+        Number(isDay(b.file)) - Number(isDay(a.file)) ||
+        (isDay(a.file) && isDay(b.file)
+          ? (b.file as TFile).basename.localeCompare((a.file as TFile).basename)
+          : 0) ||
+        Number(!a.file) - Number(!b.file) ||
+        rank(a.file) - rank(b.file),
+    );
+
+    for (const { leaf, file } of tabs) {
+      const { liEl } = this.makeIconRow(ulEl, {
+        bullet: !file
+          ? DEFAULT_BULLET
+          : isDay(file)
+            ? "🌅"
+            : noteBullet(this.app, file),
+        title: !file
+          ? leaf.getDisplayText()
+          : isDay(file)
+            ? formatDayNoteTitle(file.basename)
+            : this.app.metadataCache.getFileCache(file)?.frontmatter?.title ||
+              skillTitle(file) ||
+              file.basename,
+        description: file ? this.deadlineLabel(file) : undefined,
+        isActive: leaf === current,
+        isPrivate: file ? this.isNotePrivate(file) : false,
+        onActivate: () =>
+          this.app.workspace.setActiveLeaf(leaf, { focus: true }),
+      });
+      onMiddleClick(liEl, () => leaf.detach());
+      const closeEl = liEl.createEl("button", {
+        cls: "clickable-icon dw-tab-close",
+        attr: { "aria-label": "Close tab" },
+      });
+      setIcon(closeEl, "x");
+      closeEl.addEventListener("click", (event) => {
+        event.stopPropagation();
+        leaf.detach();
+      });
+    }
+  }
+
   private makeUlLinkList(list: TFile[] | undefined): Element {
     if (!list || list.length === 0) {
       return document.createElement("div");
@@ -842,16 +940,9 @@ export class DynamicWidgetView extends ItemView {
           onMiddleClick(linkEl, () => openInTab(this.app, note, true));
         }
 
-        const deadline = metadata?.frontmatter?.deadline;
-        const isArchived = note.path.startsWith("Archives/");
-        if (deadline != null && !isArchived) {
-          const label = formatRelativeDeadline(deadline);
-          if (label) {
-            projectEl.createEl("div", {
-              text: label,
-              cls: "dw-list-meta",
-            });
-          }
+        const label = this.deadlineLabel(note);
+        if (label) {
+          projectEl.createEl("div", { text: label, cls: "dw-list-meta" });
         }
 
         return projectEl;
@@ -1184,6 +1275,10 @@ export class DynamicWidgetView extends ItemView {
       }),
     );
 
+    this.registerEvent(
+      this.app.workspace.on("layout-change", () => this.updateContent()),
+    );
+
     // Listen for file modifications
     this.registerEvent(
       this.app.metadataCache.on("changed", (file: TFile) => {
@@ -1496,12 +1591,7 @@ export class DynamicWidgetView extends ItemView {
     const [year, month, day] = basename.split("-").map(Number);
     const noteDate = new Date(year, month - 1, day); // month is 0-indexed
     this.contentEl.createEl("h2", {
-      text: `🌅 ${noteDate.toLocaleDateString("en-US", {
-        weekday: "short",
-        month: "short",
-        day: "numeric",
-        year: "numeric",
-      })}`,
+      text: `🌅 ${formatDayNoteTitle(basename)}`,
     });
 
     this.renderCalendarEventsSection(noteDate);
@@ -1969,6 +2059,8 @@ export class DynamicWidgetView extends ItemView {
       mainView.renderQueue(this.contentEl);
       return;
     }
+
+    this.renderOpenTabs();
 
     const activeFile = this.app.workspace.getActiveFile();
     if (!activeFile) {
