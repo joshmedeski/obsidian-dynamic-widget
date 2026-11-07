@@ -26,6 +26,9 @@ import {
   formatRelativeDeadline,
   isEventNote,
   isFilePrivate,
+  dayFileNameRegex,
+  FOLDER_ICONS,
+  formatDayNoteTitle,
   isSameLocalDay,
   noteBullet,
   isValidHex,
@@ -40,23 +43,6 @@ import {
 export const VIEW_TYPE_DYNAMIC_WIDGET = "dynamic-widget-view";
 /** Where a newly captured calendar event is written. */
 const EVENT_NOTES_DIR = "Events";
-const dayFileNameRegex = /^\d{4}-\d{2}-\d{2}$/;
-
-function formatDayNoteTitle(basename: string): string {
-  const [year, month, day] = basename.split("-").map(Number);
-  const date = new Date(year, month - 1, day);
-  const label = date.toLocaleDateString("en-US", {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
-  const now = new Date();
-  const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
-  if (isSameLocalDay(date, now)) return `${label} (today)`;
-  if (isSameLocalDay(date, yesterday)) return `${label} (yesterday)`;
-  return label;
-}
 
 function skillTitle(file: TFile): string | undefined {
   if (file.basename !== "SKILL" || !file.parent?.name) return undefined;
@@ -257,7 +243,7 @@ type FolderWithTitle = {
 /** Inbox minus the event notes, which the Events section renders instead. */
 const INBOX_FOLDER: FolderWithTitle = {
   folder: "Inbox",
-  title: "📥 Inbox",
+  title: `${FOLDER_ICONS.Inbox} Inbox`,
   exclude: isEventNote,
 };
 
@@ -269,7 +255,7 @@ const INBOX_FOLDER: FolderWithTitle = {
  */
 const EVENT_NOTES_FOLDER: FolderWithTitle = {
   folder: "",
-  title: "📅 Events",
+  title: `${FOLDER_ICONS.Events} Events`,
   layout: "events",
   match: isEventNote,
 };
@@ -277,40 +263,40 @@ const EVENT_NOTES_FOLDER: FolderWithTitle = {
 /** Archives minus the event notes, which the Events section renders instead. */
 const ARCHIVES_FOLDER: FolderWithTitle = {
   folder: "Archives",
-  title: "🗄️ Archives",
+  title: `${FOLDER_ICONS.Archives} Archives`,
   timeGroup: { compareRule: "relative-date" },
   exclude: isEventNote,
 };
 
 const IS_AREA_FOLDERS: FolderWithTitle[] = [
-  { folder: "Areas", title: "🏠 Areas" },
+  { folder: "Areas", title: `${FOLDER_ICONS.Areas} Areas` },
   INBOX_FOLDER,
-  { folder: "Goals", title: "🎯 Goals" },
-  { folder: "Projects/Active", title: "✅ Active Projects" },
-  { folder: "Projects/Waiting For", title: "⏳ Waiting For" },
-  { folder: "Relationships", title: "👥 Relationships", layout: "grid" },
+  { folder: "Goals", title: `${FOLDER_ICONS.Goals} Goals` },
+  { folder: "Projects/Active", title: `${FOLDER_ICONS["Projects/Active"]} Active Projects` },
+  { folder: "Projects/Waiting For", title: `${FOLDER_ICONS["Projects/Waiting For"]} Waiting For` },
+  { folder: "Relationships", title: `${FOLDER_ICONS.Relationships} Relationships`, layout: "grid" },
   EVENT_NOTES_FOLDER,
-  { folder: "Resources", title: "📚 Resources" },
+  { folder: "Resources", title: `${FOLDER_ICONS.Resources} Resources` },
   {
     folder: "Projects/Someday Maybe",
-    title: "🔮 Someday Maybe",
+    title: `${FOLDER_ICONS["Projects/Someday Maybe"]} Someday Maybe`,
     timeGroup: { compareRule: "relative-date" },
   },
   ARCHIVES_FOLDER,
 ];
 
 const HAS_AREAS_FOLDERS: FolderWithTitle[] = [
-  { folder: "Areas", title: "🏠 Areas" },
+  { folder: "Areas", title: `${FOLDER_ICONS.Areas} Areas` },
   INBOX_FOLDER,
-  { folder: "Goals", title: "🎯 Goals" },
-  { folder: "Projects/Active", title: "✅ Active Projects" },
-  { folder: "Projects/Waiting For", title: "⏳ Waiting For" },
-  { folder: "Relationships", title: "👥 Relationships", layout: "grid" },
+  { folder: "Goals", title: `${FOLDER_ICONS.Goals} Goals` },
+  { folder: "Projects/Active", title: `${FOLDER_ICONS["Projects/Active"]} Active Projects` },
+  { folder: "Projects/Waiting For", title: `${FOLDER_ICONS["Projects/Waiting For"]} Waiting For` },
+  { folder: "Relationships", title: `${FOLDER_ICONS.Relationships} Relationships`, layout: "grid" },
   EVENT_NOTES_FOLDER,
-  { folder: "Resources", title: "📚 Resources" },
+  { folder: "Resources", title: `${FOLDER_ICONS.Resources} Resources` },
   {
     folder: "Projects/Someday Maybe",
-    title: "🔮 Someday Maybe",
+    title: `${FOLDER_ICONS["Projects/Someday Maybe"]} Someday Maybe`,
     timeGroup: { compareRule: "relative-date" },
   },
   ARCHIVES_FOLDER,
@@ -322,22 +308,22 @@ const IS_DAILY_FOLDERS: FolderWithTitle[] = [
 
 const RELATIONSHIP_FOLDERS: FolderWithTitle[] = [
   INBOX_FOLDER,
-  { folder: "Projects/Active", title: "✅ Active Projects" },
-  { folder: "Projects/Waiting For", title: "⏳ Waiting For" },
+  { folder: "Projects/Active", title: `${FOLDER_ICONS["Projects/Active"]} Active Projects` },
+  { folder: "Projects/Waiting For", title: `${FOLDER_ICONS["Projects/Waiting For"]} Waiting For` },
   {
     folder: "Projects/Someday Maybe",
-    title: "🔮 Someday Maybe",
+    title: `${FOLDER_ICONS["Projects/Someday Maybe"]} Someday Maybe`,
     timeGroup: { compareRule: "relative-date" },
   },
   EVENT_NOTES_FOLDER,
   {
     folder: "Days",
-    title: "📅 Days",
+    title: `${FOLDER_ICONS.Days} Days`,
     timeGroup: { compareRule: "day-heatmap" },
   },
-  { folder: "Goals", title: "🎯 Goals" },
-  { folder: "Areas", title: "🏠 Areas" },
-  { folder: "Resources", title: "📚 Resources" },
+  { folder: "Goals", title: `${FOLDER_ICONS.Goals} Goals` },
+  { folder: "Areas", title: `${FOLDER_ICONS.Areas} Areas` },
+  { folder: "Resources", title: `${FOLDER_ICONS.Resources} Resources` },
   ARCHIVES_FOLDER,
 ];
 
@@ -1606,13 +1592,13 @@ export class DynamicWidgetView extends ItemView {
     }
 
     // Active Projects grouped by area priority
-    this.renderFolderByArea(allFiles, "Projects/Active/", "✅ Active Projects");
+    this.renderFolderByArea(allFiles, "Projects/Active/", `${FOLDER_ICONS["Projects/Active"]} Active Projects`);
 
     // Waiting For grouped by area priority
     this.renderFolderByArea(
       allFiles,
       "Projects/Waiting For/",
-      "⏳ Waiting For",
+      `${FOLDER_ICONS["Projects/Waiting For"]} Waiting For`,
     );
   }
 
@@ -2079,7 +2065,7 @@ export class DynamicWidgetView extends ItemView {
       this.renderFolderByArea(
         allFiles,
         "Projects/Active/",
-        "✅ Active Projects",
+        `${FOLDER_ICONS["Projects/Active"]} Active Projects`,
       );
       return;
     }

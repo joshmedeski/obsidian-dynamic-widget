@@ -2,6 +2,7 @@ import { ItemView, type TFile, type WorkspaceLeaf } from "obsidian";
 import { type AreaNode, getAreaHierarchy } from "./areas-hierarchy";
 import type DynamicWidgetPlugin from "./main";
 import {
+  FOLDER_ICONS,
   formatRelativeDeadline,
   isFilePrivate,
   isValidHex,
@@ -116,7 +117,7 @@ export class SomedayMaybeView extends ItemView {
     this.contentEl.empty();
 
     this.contentEl.createEl("div", {
-      text: "🔮 Someday Maybe",
+      text: `${FOLDER_ICONS["Projects/Someday Maybe"]} Someday Maybe`,
       cls: "someday-maybe-title",
     });
 

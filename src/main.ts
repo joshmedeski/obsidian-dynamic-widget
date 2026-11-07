@@ -1,4 +1,4 @@
-import { MarkdownView, Plugin, type TFile } from 'obsidian';
+import { MarkdownView, Plugin, type TFile, type WorkspaceLeaf } from 'obsidian';
 
 import { AreaGraphView, VIEW_TYPE_AREA_GRAPH } from './area-graph-view';
 import { AreaTableView, VIEW_TYPE_AREA_TABLE } from './area-table-view';
@@ -22,7 +22,7 @@ import {
   SomedayMaybeView,
   VIEW_TYPE_SOMEDAY_MAYBE,
 } from './someday-maybe-view';
-import { isFilePrivate } from './utils';
+import { dayFileNameRegex, formatDayNoteTitle, isFilePrivate, noteBullet } from './utils';
 
 interface PluginData {
   privateMode: boolean;
@@ -40,6 +40,14 @@ export default class DynamicWidgetPlugin extends Plugin {
     this.privateMode = data?.privateMode ?? DEFAULT_DATA.privateMode;
 
     this.editorFooter.attach(this);
+
+    const renderNoteTitles = () => this.renderNoteTitles();
+    this.registerEvent(this.app.workspace.on('file-open', renderNoteTitles));
+    this.registerEvent(this.app.workspace.on('layout-change', renderNoteTitles));
+    this.registerEvent(this.app.vault.on('rename', renderNoteTitles));
+    this.registerEvent(this.app.metadataCache.on('changed', renderNoteTitles));
+    this.app.workspace.onLayoutReady(renderNoteTitles);
+    this.register(() => this.renderNoteTitles(true));
     // Register the dynamic widget view
     this.registerView(
       VIEW_TYPE_DYNAMIC_WIDGET,
@@ -348,6 +356,41 @@ export default class DynamicWidgetPlugin extends Plugin {
       active: true,
     });
     this.app.workspace.revealLeaf(leaf);
+  }
+
+  private renderNoteTitles(clear = false) {
+    this.app.workspace.iterateAllLeaves((leaf) => {
+      const view = leaf.view;
+      if (!(view instanceof MarkdownView)) return;
+      const inlineTitleEl = (view as MarkdownView & { inlineTitleEl?: HTMLElement }).inlineTitleEl;
+      const tabTitleEl = (leaf as WorkspaceLeaf & { tabHeaderInnerTitleEl?: HTMLElement }).tabHeaderInnerTitleEl;
+      const file = view.file;
+      const existing = inlineTitleEl?.parentElement?.querySelector('.day-note-title');
+
+      if (clear || !file) {
+        inlineTitleEl?.removeClass('is-day-note');
+        inlineTitleEl?.removeAttribute('data-note-icon');
+        existing?.remove();
+        if (file) tabTitleEl?.setText(file.basename);
+        return;
+      }
+
+      const isDay = dayFileNameRegex.test(file.basename);
+      const icon = isDay ? '🌅' : noteBullet(this.app, file);
+      const title = isDay ? formatDayNoteTitle(file.basename) : file.basename;
+
+      inlineTitleEl?.toggleClass('is-day-note', isDay);
+      if (isDay) {
+        inlineTitleEl?.removeAttribute('data-note-icon');
+        const dayTitleEl =
+          existing ?? inlineTitleEl?.insertAdjacentElement('beforebegin', createDiv('inline-title day-note-title'));
+        dayTitleEl?.setText(`${icon} ${title}`);
+      } else {
+        existing?.remove();
+        inlineTitleEl?.setAttribute('data-note-icon', icon);
+      }
+      tabTitleEl?.setText(`${icon} ${title}`);
+    });
   }
 
   onunload() {

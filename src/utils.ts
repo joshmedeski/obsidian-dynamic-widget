@@ -3,6 +3,25 @@ import { type App, TFile, type WorkspaceLeaf } from "obsidian";
 /** Bullet shown for a list item whose note has no `icon` frontmatter. */
 export const DEFAULT_BULLET = "\u23FA\uFE0F";
 
+export const FOLDER_ICONS: Record<string, string> = {
+  Inbox: "📥",
+  Areas: "🏠",
+  Goals: "🎯",
+  "Projects/Active": "✅",
+  "Projects/Waiting For": "⏳",
+  "Projects/Someday Maybe": "🔮",
+  Relationships: "👥",
+  Resources: "📚",
+  Archives: "🗄️",
+  Days: "📅",
+  Events: "📅",
+};
+
+function folderIcon(file: TFile): string | undefined {
+  const folder = Object.keys(FOLDER_ICONS).find((f) => file.path.startsWith(`${f}/`));
+  return folder ? FOLDER_ICONS[folder] : undefined;
+}
+
 /** Bullet for a calendar event that has not been captured as a note yet. */
 export const DEFAULT_EVENT_BULLET = "\u{1F535}";
 
@@ -76,11 +95,6 @@ export function areaIcon(app: App, areaName: string): string | undefined {
   return typeof icon === "string" && icon.length > 0 ? icon : undefined;
 }
 
-/**
- * The bullet a note renders with: its own `icon`, else the icon of the first
- * area it is filed under, else `fallback`. Inheriting the area's icon means an
- * unadorned note still reads as belonging somewhere.
- */
 export function noteBullet(
   app: App,
   file: TFile,
@@ -91,11 +105,11 @@ export function noteBullet(
   if (typeof icon === "string" && icon.length > 0) return icon;
 
   const areas = normalizeAreasFrontmatter(frontmatter?.areas ?? []) ?? [];
-  const firstArea = areas[0];
-  return (
-    (firstArea ? areaIcon(app, simplifyWikiLink(firstArea)) : undefined) ??
-    fallback
-  );
+  for (const area of areas) {
+    const icon = areaIcon(app, simplifyWikiLink(area));
+    if (icon) return icon;
+  }
+  return folderIcon(file) ?? fallback;
 }
 
 export function isFilePrivate(app: App, file: TFile): boolean {
@@ -357,4 +371,22 @@ export function isSameLocalDay(a: Date, b: Date): boolean {
     a.getMonth() === b.getMonth() &&
     a.getDate() === b.getDate()
   );
+}
+
+export const dayFileNameRegex = /^\d{4}-\d{2}-\d{2}$/;
+
+export function formatDayNoteTitle(basename: string): string {
+  const [year, month, day] = basename.split("-").map(Number);
+  const date = new Date(year, month - 1, day);
+  const label = date.toLocaleDateString("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+  const now = new Date();
+  const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+  if (isSameLocalDay(date, now)) return `${label} (today)`;
+  if (isSameLocalDay(date, yesterday)) return `${label} (yesterday)`;
+  return label;
 }

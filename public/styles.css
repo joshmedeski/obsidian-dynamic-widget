@@ -1350,3 +1350,11 @@
 .area-graph-labels text.is-hidden {
   display: none;
 }
+
+.inline-title.is-day-note {
+  display: none;
+}
+
+.inline-title[data-note-icon]::before {
+  content: attr(data-note-icon) " ";
+}
