@@ -427,8 +427,13 @@
   --area-tint-strength: 18%;
   background: color-mix(
     in oklch,
-    var(--area-color) var(--area-tint-strength),
-    var(--background-primary)
+    color-mix(
+        in oklch,
+        var(--area-color) var(--area-tint-strength),
+        var(--background-primary)
+      )
+      60%,
+    transparent
   );
   border-radius: var(--radius-m);
   display: block;
