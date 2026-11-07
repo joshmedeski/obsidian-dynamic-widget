@@ -22,7 +22,7 @@ import {
   SomedayMaybeView,
   VIEW_TYPE_SOMEDAY_MAYBE,
 } from './someday-maybe-view';
-import { dayFileNameRegex, formatDayNoteTitle, isFilePrivate, noteBullet } from './utils';
+import { dayFileNameRegex, FOLDER_ICONS, formatDayNoteTitle, isFilePrivate, noteBullet } from './utils';
 
 interface PluginData {
   privateMode: boolean;
@@ -367,7 +367,19 @@ export default class DynamicWidgetPlugin extends Plugin {
       const file = view.file;
       const existing = inlineTitleEl?.parentElement?.querySelector('.day-note-title');
 
+      const breadcrumbEls = view.containerEl.querySelectorAll<HTMLElement>(
+        '.view-header-title-parent .view-header-breadcrumb',
+      );
+      const headerTitleEl = view.containerEl.querySelector<HTMLElement>('.view-header-title');
+      const folders = file?.parent?.path.split('/') ?? [];
+      breadcrumbEls.forEach((el, i) => {
+        const icon = FOLDER_ICONS[folders.slice(0, i + 1).join('/')];
+        if (clear || !icon) el.removeAttribute('data-note-icon');
+        else el.setAttribute('data-note-icon', icon);
+      });
+
       if (clear || !file) {
+        headerTitleEl?.removeAttribute('data-note-icon');
         inlineTitleEl?.removeClass('is-day-note');
         inlineTitleEl?.removeAttribute('data-note-icon');
         existing?.remove();
@@ -389,6 +401,7 @@ export default class DynamicWidgetPlugin extends Plugin {
         existing?.remove();
         inlineTitleEl?.setAttribute('data-note-icon', icon);
       }
+      headerTitleEl?.setAttribute('data-note-icon', icon);
       tabTitleEl?.setText(`${icon} ${title}`);
     });
   }

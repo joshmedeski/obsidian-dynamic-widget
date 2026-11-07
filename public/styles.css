@@ -108,6 +108,11 @@
   display: none;
 }
 
+.workspace-split.mod-root .workspace-leaf-content .view-header {
+  height: var(--header-height);
+  padding-block: 0;
+}
+
 /* Container styling */
 .dynamic-widget-container {
   padding: 1em;
@@ -1365,6 +1370,13 @@
   display: none;
 }
 
-.inline-title[data-note-icon]::before {
-  content: attr(data-note-icon) " ";
+.inline-title[data-note-icon]::before,
+.view-header-breadcrumb[data-note-icon]::before,
+.view-header-title[data-note-icon]::before {
+  content: attr(data-note-icon);
+  display: inline-block;
+  margin-inline-end: 0.5em;
+  font-size: 1.1em;
+  line-height: 1;
+  vertical-align: -0.08em;
 }
