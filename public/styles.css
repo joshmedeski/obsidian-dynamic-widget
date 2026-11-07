@@ -96,6 +96,16 @@
   right: 0.15em;
   transform: translateY(-50%);
   padding: 0.15em;
+  opacity: 0;
+}
+
+.dw-tabs .dw-list-item:hover .dw-tab-close,
+.dw-tab-close:focus-visible {
+  opacity: 1;
+}
+
+.workspace-split.mod-root .workspace-tab-header-container {
+  display: none;
 }
 
 /* Container styling */
