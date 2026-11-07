@@ -14,7 +14,7 @@ import {
   suggestAreas,
 } from "./area-suggestion";
 import { type CalendarEvent, fetchEventsForDate } from "./calendar";
-import { areaOrder, FolderTriageView, rankOf } from "./folder-triage-view";
+import { FolderTriageView } from "./folder-triage-view";
 import type DynamicWidgetPlugin from "./main";
 import {
   areaIcon,
@@ -812,20 +812,8 @@ export class DynamicWidgetView extends ItemView {
       tabs.push({ leaf, file });
     });
 
-    const order = areaOrder(this.app);
     const isDay = (file: TFile | null) =>
       !!file && dayFileNameRegex.test(file.basename);
-    const rank = (file: TFile | null) =>
-      file ? rankOf(this.app, file, order).rank : Infinity;
-    tabs.sort(
-      (a, b) =>
-        Number(isDay(b.file)) - Number(isDay(a.file)) ||
-        (isDay(a.file) && isDay(b.file)
-          ? (b.file as TFile).basename.localeCompare((a.file as TFile).basename)
-          : 0) ||
-        Number(!a.file) - Number(!b.file) ||
-        rank(a.file) - rank(b.file),
-    );
 
     for (const { leaf, file } of tabs) {
       const { liEl } = this.makeIconRow(ulEl, {

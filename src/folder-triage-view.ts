@@ -640,7 +640,7 @@ function noteAreas(app: App, file: TFile): string[] {
   return raw ? normalizeAreasFrontmatter(raw).map(simplifyWikiLink) : [];
 }
 
-export function areaOrder(app: App): Map<string, number> {
+function areaOrder(app: App): Map<string, number> {
   const order = new Map<string, number>();
   const walk = (node: AreaNode) => {
     order.set(node.file.basename, order.size);
@@ -650,7 +650,7 @@ export function areaOrder(app: App): Map<string, number> {
   return order;
 }
 
-export function rankOf(app: App, file: TFile, order: Map<string, number>): Ranked {
+function rankOf(app: App, file: TFile, order: Map<string, number>): Ranked {
   let best: Ranked = { rank: Infinity, root: null };
   for (const area of noteAreas(app, file)) {
     const chain = [area, ...getAreaAncestors(app, area)];
