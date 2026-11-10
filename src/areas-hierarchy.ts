@@ -90,6 +90,16 @@ export function getAreaHierarchy(app: App): AreaNode[] {
   });
 }
 
+export function areaOrder(app: App): Map<string, number> {
+  const order = new Map<string, number>();
+  const walk = (node: AreaNode) => {
+    order.set(node.file.basename, order.size);
+    node.children.forEach(walk);
+  };
+  getAreaHierarchy(app).forEach(walk);
+  return order;
+}
+
 /** Collect all area names under a node (the node itself + all descendants) */
 export function collectAreaNames(node: AreaNode): string[] {
   const names = [node.file.basename];

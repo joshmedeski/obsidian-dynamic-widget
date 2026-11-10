@@ -1,5 +1,5 @@
 import type { App, TFile } from "obsidian";
-import { getAreaAncestors } from "./areas-hierarchy";
+import { areaOrder, getAreaAncestors } from "./areas-hierarchy";
 import { type CalendarEvent, fetchEventsForDate } from "./calendar";
 import type DynamicWidgetPlugin from "./main";
 import {
@@ -164,12 +164,10 @@ function areaColor(ctx: WidgetContext, area: string | undefined): string | null 
   return null;
 }
 
-function rootPriority(app: App, area: string | undefined): number {
+function areaRank(app: App, order: Map<string, number>, area: string | undefined): number {
   if (!area) return Number.POSITIVE_INFINITY;
-  const root = [area, ...getAreaAncestors(app, area)].pop() ?? area;
-  const file = areaFile(app, root);
-  const priority = file ? frontmatter(app, file).priority : undefined;
-  return typeof priority === "number" ? priority : Number.POSITIVE_INFINITY;
+  const known = [area, ...getAreaAncestors(app, area)].find((name) => order.has(name));
+  return known ? (order.get(known) as number) : Number.POSITIVE_INFINITY;
 }
 
 function coverSrc(ctx: WidgetContext, file: TFile): string | null {
@@ -301,10 +299,10 @@ const projects: HomeWidget = {
   column: "main",
   async render(el, ctx) {
     const { app } = ctx;
-    const files = activeProjects(app).sort(
-      (a, b) =>
-        rootPriority(app, firstArea(app, a)) - rootPriority(app, firstArea(app, b)) ||
-        a.basename.localeCompare(b.basename),
+    const order = areaOrder(app);
+    const rank = new Map(activeProjects(app).map((f) => [f, areaRank(app, order, firstArea(app, f))]));
+    const files = [...rank.keys()].sort(
+      (a, b) => (rank.get(a) as number) - (rank.get(b) as number) || a.basename.localeCompare(b.basename),
     );
     if (files.length === 0) {
       el.createEl("p", { text: "No active projects.", cls: "home-widget-empty" });

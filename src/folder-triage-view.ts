@@ -12,11 +12,7 @@ import {
   type WorkspaceLeaf,
 } from "obsidian";
 import { AreaPickerModal } from "./area-triage-view";
-import {
-  type AreaNode,
-  getAreaAncestors,
-  getAreaHierarchy,
-} from "./areas-hierarchy";
+import { areaOrder, getAreaAncestors } from "./areas-hierarchy";
 import {
   type DynamicWidgetView,
   VIEW_TYPE_DYNAMIC_WIDGET,
@@ -638,16 +634,6 @@ export class FolderTriageView extends ItemView {
 function noteAreas(app: App, file: TFile): string[] {
   const raw = app.metadataCache.getFileCache(file)?.frontmatter?.areas;
   return raw ? normalizeAreasFrontmatter(raw).map(simplifyWikiLink) : [];
-}
-
-function areaOrder(app: App): Map<string, number> {
-  const order = new Map<string, number>();
-  const walk = (node: AreaNode) => {
-    order.set(node.file.basename, order.size);
-    node.children.forEach(walk);
-  };
-  getAreaHierarchy(app).forEach(walk);
-  return order;
 }
 
 function rankOf(app: App, file: TFile, order: Map<string, number>): Ranked {
