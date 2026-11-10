@@ -15,6 +15,8 @@ import {
 } from "./area-suggestion";
 import { type CalendarEvent, fetchEventsForDate } from "./calendar";
 import { FolderTriageView } from "./folder-triage-view";
+import { HomeView } from "./home-view";
+import { openToday, renderRecent, renderToday } from "./home-widgets";
 import type DynamicWidgetPlugin from "./main";
 import {
   areaIcon,
@@ -818,7 +820,9 @@ export class DynamicWidgetView extends ItemView {
     for (const { leaf, file } of tabs) {
       const { liEl } = this.makeIconRow(ulEl, {
         bullet: !file
-          ? DEFAULT_BULLET
+          ? leaf.view instanceof HomeView
+            ? "🏠"
+            : DEFAULT_BULLET
           : isDay(file)
             ? "🌅"
             : noteBullet(this.app, file),
@@ -1251,6 +1255,14 @@ export class DynamicWidgetView extends ItemView {
 
     this.registerEvent(
       this.app.workspace.on("layout-change", () => this.updateContent()),
+    );
+
+    this.registerInterval(
+      window.setInterval(() => {
+        if (this.app.workspace.getMostRecentLeaf()?.view instanceof HomeView) {
+          this.updateContent();
+        }
+      }, 60_000),
     );
 
     // Listen for file modifications
@@ -2035,6 +2047,29 @@ export class DynamicWidgetView extends ItemView {
     }
 
     this.renderOpenTabs();
+    if (mainView instanceof HomeView) {
+      const sectionEl = this.contentEl.createEl("section");
+      sectionEl.createEl("h3", { text: "🕘 Recent" });
+      const ctx = {
+        app: this.app,
+        plugin: this.plugin,
+        open: (file: TFile) => void this.app.workspace.getLeaf(false).openFile(file),
+      };
+      renderRecent(sectionEl, ctx);
+      const todayEl = this.contentEl.createEl("section", { cls: "home-today" });
+      const today = new Date().toLocaleDateString("en-US", {
+        weekday: "short",
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      });
+      todayEl.createEl("h3", { text: `📅 ${today}` });
+      todayEl.addEventListener("click", () => openToday(ctx));
+      void renderToday(todayEl, ctx, (event, background) => {
+        void this.openOrCreateEventNote(event, background);
+      });
+      return;
+    }
 
     const activeFile = this.app.workspace.getActiveFile();
     if (!activeFile) {
