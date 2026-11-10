@@ -14,6 +14,7 @@ import {
   VIEW_TYPE_DYNAMIC_WIDGET,
 } from './dynamic-widget-view';
 import { EditorFooter } from './editor-footer';
+import { HomeView, VIEW_TYPE_HOME } from './home-view';
 import {
   PrivateNoteView,
   VIEW_TYPE_PRIVATE_NOTE,
@@ -93,6 +94,29 @@ export default class DynamicWidgetPlugin extends Plugin {
       VIEW_TYPE_SOMEDAY_MAYBE,
       (leaf) => new SomedayMaybeView(leaf, this)
     );
+
+    this.registerView(VIEW_TYPE_HOME, (leaf) => new HomeView(leaf, this));
+
+    const replaceEmptyTabs = () => {
+      const homes: WorkspaceLeaf[] = [];
+      const empties: WorkspaceLeaf[] = [];
+      this.app.workspace.iterateRootLeaves((leaf) => {
+        const type = leaf.view.getViewType();
+        if (type === VIEW_TYPE_HOME) homes.push(leaf);
+        else if (type === 'empty') empties.push(leaf);
+      });
+      if (homes.length === 0) {
+        const first = empties.shift();
+        if (first) void first.setViewState({ type: VIEW_TYPE_HOME });
+        return;
+      }
+      const extras = [...empties, ...homes.slice(1)];
+      if (extras.length === 0) return;
+      for (const leaf of extras) leaf.detach();
+      this.app.workspace.setActiveLeaf(homes[0], { focus: true });
+    };
+    this.registerEvent(this.app.workspace.on('layout-change', replaceEmptyTabs));
+    this.app.workspace.onLayoutReady(replaceEmptyTabs);
 
     // Intercept private file opens
     this.registerEvent(
@@ -264,6 +288,10 @@ export default class DynamicWidgetPlugin extends Plugin {
     );
     for (const leaf of tableLeaves) {
       (leaf.view as AreaTableView).refreshContent();
+    }
+
+    for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE_HOME)) {
+      (leaf.view as HomeView).refreshContent();
     }
 
     // Re-render someday maybe view
