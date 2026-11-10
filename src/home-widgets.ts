@@ -39,6 +39,7 @@ export interface HomeWidget {
 }
 
 const RECENT_LISTENS = 6;
+const RECENT_PEOPLE = 6;
 
 const MEDIA: Record<string, number> = {
   book: 2 / 3,
@@ -650,6 +651,54 @@ const days: HomeWidget = {
   },
 };
 
+const people: HomeWidget = {
+  id: "people",
+  title: `${FOLDER_ICONS.Relationships} Recent People`,
+  column: "main",
+  render(el, ctx) {
+    const { app } = ctx;
+    const now = Date.now();
+    const sources = [
+      ...filesIn(app, "Days")
+        .filter((f) => dayFileNameRegex.test(f.basename))
+        .map((file) => ({ file, date: new Date(`${file.basename}T00:00`) })),
+      ...filesIn(app, "Events").map((file) => ({ file, date: eventNoteWhen(app, file).date })),
+    ]
+      .filter((s) => s.date.getTime() <= now)
+      .sort((a, b) => b.date.getTime() - a.date.getTime());
+
+    const recent: TFile[] = [];
+    const seen = new Set<string>();
+    for (const { file } of sources) {
+      const cache = app.metadataCache.getFileCache(file);
+      for (const link of [...(cache?.links ?? []), ...(cache?.frontmatterLinks ?? [])]) {
+        const target = app.metadataCache.getFirstLinkpathDest(link.link, file.path);
+        if (!target?.path.startsWith("Relationships/") || seen.has(target.path)) continue;
+        seen.add(target.path);
+        recent.push(target);
+      }
+      if (recent.length >= RECENT_PEOPLE) break;
+    }
+
+    if (recent.length === 0) {
+      el.createEl("p", { text: "No people in your day notes or events yet.", cls: "home-widget-empty" });
+      return;
+    }
+
+    const row = el.createDiv("home-shelf home-people");
+    for (const person of recent.slice(0, RECENT_PEOPLE)) {
+      const item = row.createDiv("home-shelf-item");
+      item.style.setProperty("--cover-ratio", "1");
+      const src = coverSrc(ctx, person);
+      if (src) item.createEl("img", { cls: "home-shelf-cover", attr: { src, alt: "" } });
+      else item.createDiv({ text: noteBullet(app, person), cls: "home-shelf-cover is-placeholder" });
+      item.createDiv({ text: title(ctx, person), cls: "home-shelf-title" });
+      item.setAttr("aria-label", title(ctx, person));
+      makeOpenable(ctx, item, person);
+    }
+  },
+};
+
 const listens: HomeWidget = {
   id: "listens",
   title: "🎧 Recent Listens",
@@ -698,6 +747,7 @@ export const HOME_WIDGETS: HomeWidget[] = [
   recentEvents,
   wins,
   days,
+  people,
   listens,
   rediscover,
 ];

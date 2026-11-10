@@ -1669,6 +1669,15 @@
   max-width: 200px;
 }
 
+.home-people .home-shelf-item {
+  max-width: 120px;
+  text-align: center;
+}
+
+.home-people .home-shelf-cover {
+  border-radius: 50%;
+}
+
 /* Rediscover */
 .home-chips {
   display: flex;
