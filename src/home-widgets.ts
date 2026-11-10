@@ -506,7 +506,7 @@ const recentEvents: HomeWidget = {
 
 const media: HomeWidget = {
   id: "media",
-  title: "🍿 Currently",
+  title: "🍿 Media",
   count: (app) => activeMedia(app).length,
   column: "main",
   render(el, ctx) {
@@ -653,7 +653,7 @@ const days: HomeWidget = {
 
 const people: HomeWidget = {
   id: "people",
-  title: `${FOLDER_ICONS.Relationships} Recent People`,
+  title: `${FOLDER_ICONS.Relationships} Recent Relationships`,
   column: "main",
   render(el, ctx) {
     const { app } = ctx;
@@ -681,7 +681,7 @@ const people: HomeWidget = {
     }
 
     if (recent.length === 0) {
-      el.createEl("p", { text: "No people in your day notes or events yet.", cls: "home-widget-empty" });
+      el.createEl("p", { text: "No relationships in your day notes or events yet.", cls: "home-widget-empty" });
       return;
     }
 
