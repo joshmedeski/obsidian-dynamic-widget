@@ -39,7 +39,7 @@ export interface HomeWidget {
 }
 
 const RECENT_LISTENS = 6;
-const RECENT_PEOPLE = 6;
+const RECENT_PEOPLE = 8;
 
 const MEDIA: Record<string, number> = {
   book: 2 / 3,
