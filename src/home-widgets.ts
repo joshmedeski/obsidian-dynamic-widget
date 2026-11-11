@@ -527,7 +527,6 @@ const media: HomeWidget = {
       const src = coverSrc(ctx, file);
       if (src) cover.createEl("img", { cls: "home-shelf-cover", attr: { src, alt: "" } });
       else cover.createDiv({ text: noteBullet(app, file), cls: "home-shelf-cover is-placeholder" });
-      item.createDiv({ text: title(ctx, file), cls: "home-shelf-title" });
       const progress = frontmatter(app, file).progress;
       if ((typeof progress === "string" || typeof progress === "number") && !isPrivate(ctx, file)) {
         item.createDiv({ text: String(progress), cls: "home-shelf-progress" });
