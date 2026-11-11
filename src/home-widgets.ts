@@ -743,8 +743,8 @@ export const HOME_WIDGETS: HomeWidget[] = [
   waiting,
   recentEvents,
   wins,
-  days,
   people,
   media,
+  days,
   rediscover,
 ];
