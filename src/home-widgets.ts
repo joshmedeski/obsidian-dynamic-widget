@@ -739,13 +739,13 @@ const listens: HomeWidget = {
 
 export const HOME_WIDGETS: HomeWidget[] = [
   projects,
-  media,
+  listens,
   inbox,
   waiting,
   recentEvents,
   wins,
   days,
   people,
-  listens,
+  media,
   rediscover,
 ];
