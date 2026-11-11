@@ -710,7 +710,7 @@ const listens: HomeWidget = {
     const albums: { album: TFile; day: TFile }[] = [];
     const seen = new Set<string>();
     for (const day of dayNotes) {
-      for (const link of app.metadataCache.getFileCache(day)?.links ?? []) {
+      for (const link of [...(app.metadataCache.getFileCache(day)?.links ?? [])].reverse()) {
         const target = app.metadataCache.getFirstLinkpathDest(link.link, day.path);
         if (!target || seen.has(target.path) || frontmatter(app, target).type !== "album") continue;
         seen.add(target.path);
