@@ -70,9 +70,9 @@ way: that is what makes it runnable on mobile and testable outside Obsidian.
 Everything Obsidian-shaped lives in `src/area-suggestion.ts`. The widget only
 renders the result, through the shared `makeIconRow` (icon gutter + title +
 optional description) that calendar event rows also use. `updateContent` calls
-`renderMedia` and then `renderAreaSuggestions` ahead of the type switch, so
-cover art and suggestions are pinned to the top for every note type — do not
-put `renderMedia` back inside the per-type renderers. Consequences:
+`renderMedia` before `renderOpenTabs`, so cover art sits above the Tabs section
+for every note type (Home excluded), and `renderAreaSuggestions` ahead of the
+type switch — do not put `renderMedia` back inside the per-type renderers. Consequences:
 
 - **No external dependency.** The classifier was ported from the `vault-areas`
   Python package in `~/c/decision-engine`; that repo is no longer required, or

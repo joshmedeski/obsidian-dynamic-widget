@@ -2046,6 +2046,14 @@ export class DynamicWidgetView extends ItemView {
       return;
     }
 
+    const activeFile = this.app.workspace.getActiveFile();
+    if (activeFile && !(mainView instanceof HomeView)) {
+      this.renderMedia({
+        cover: this.app.metadataCache.getFileCache(activeFile)?.frontmatter?.cover,
+        activeFilePath: activeFile.path,
+      });
+    }
+
     this.renderOpenTabs();
     if (mainView instanceof HomeView) {
       const sectionEl = this.contentEl.createEl("section");
@@ -2071,7 +2079,6 @@ export class DynamicWidgetView extends ItemView {
       return;
     }
 
-    const activeFile = this.app.workspace.getActiveFile();
     if (!activeFile) {
       const allFiles = this.app.vault.getFiles();
 
@@ -2095,13 +2102,6 @@ export class DynamicWidgetView extends ItemView {
 
     const activeFileType = this.determineActiveFileType(activeFile);
 
-    // Cover art, then suggestions, then the type-specific body. Hoisted out of
-    // the per-type renderers so both stay pinned to the top for every note.
-    this.renderMedia({
-      cover: this.app.metadataCache.getFileCache(activeFile)?.frontmatter?.cover,
-      activeFilePath: activeFile.path,
-    });
-    // A day note is a journal page, not something that gets filed under areas.
     if (activeFileType !== "day") {
       this.renderAreaSuggestions(activeFile);
     }
