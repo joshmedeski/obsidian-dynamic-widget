@@ -109,7 +109,8 @@
 }
 
 .workspace-split.mod-root .workspace-leaf-content .view-header {
-  display: none;
+  height: var(--header-height);
+  padding-block: 0;
 }
 
 /* Container styling */
@@ -1373,7 +1374,9 @@
   display: none;
 }
 
-.inline-title[data-note-icon]::before {
+.inline-title[data-note-icon]::before,
+.view-header-breadcrumb[data-note-icon]::before,
+.view-header-title[data-note-icon]::before {
   content: attr(data-note-icon);
   display: inline-block;
   margin-inline-end: 0.5em;
