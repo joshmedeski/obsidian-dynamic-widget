@@ -49,7 +49,6 @@ const MEDIA: Record<string, number> = {
   album: 1,
   video: 16 / 9,
 };
-const MEDIA_ORDER = Object.keys(MEDIA);
 const LIST_LIMIT = 8;
 const RECENT_LIMIT = 12;
 const REDISCOVER_PICKS = 4;
@@ -509,11 +508,7 @@ const media: HomeWidget = {
   column: "main",
   render(el, ctx) {
     const { app } = ctx;
-    const media = activeMedia(app).sort(
-        (a, b) =>
-          MEDIA_ORDER.indexOf(a.type) - MEDIA_ORDER.indexOf(b.type) ||
-          a.file.basename.localeCompare(b.file.basename),
-      );
+    const media = activeMedia(app).sort((a, b) => b.file.stat.mtime - a.file.stat.mtime);
     if (media.length === 0) {
       el.createEl("p", { text: "Nothing in progress.", cls: "home-widget-empty" });
       return;
