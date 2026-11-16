@@ -309,10 +309,13 @@
 
 .editor-footer-covers {
   display: flex;
-  flex-wrap: wrap;
   gap: 16px;
   padding: 8px 16px;
-  overflow: hidden;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x proximity;
+  scroll-padding-inline: 16px;
+  mask-image: linear-gradient(to right, black calc(100% - 48px), transparent);
   height: 200px;
   min-height: 80px;
   max-height: 500px;
@@ -322,6 +325,7 @@
   flex: 0 0 auto;
   position: relative;
   cursor: pointer;
+  scroll-snap-align: start;
   height: 100%;
   padding-bottom: 18px;
 }
