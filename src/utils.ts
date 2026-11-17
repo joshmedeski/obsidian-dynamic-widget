@@ -208,8 +208,34 @@ export function formatRelativeDeadline(
     (dueDay.getTime() - today.getTime()) / 86_400_000,
   );
 
-  const rtf = new Intl.RelativeTimeFormat("en", { numeric: "auto" });
-  return `🏁 ${rtf.format(days, "day")}`;
+  const [from, to] = days < 0 ? [dueDay, today] : [today, dueDay];
+  const months = monthsBetween(from, to);
+  if (months === 0) {
+    const rtf = new Intl.RelativeTimeFormat("en", { numeric: "auto" });
+    return `🏁 ${rtf.format(days, "day")}`;
+  }
+
+  const anchor = addMonths(from, months);
+  const rest = Math.round((to.getTime() - anchor.getTime()) / 86_400_000);
+  const plural = (n: number, unit: string) => `${n} ${unit}${n === 1 ? "" : "s"}`;
+  const span = rest
+    ? `${plural(months, "month")} and ${plural(rest, "day")}`
+    : plural(months, "month");
+  return days < 0 ? `🏁 ${span} ago` : `🏁 in ${span}`;
+}
+
+function addMonths(date: Date, months: number): Date {
+  const year = date.getFullYear();
+  const month = date.getMonth() + months;
+  const lastDay = new Date(year, month + 1, 0).getDate();
+  return new Date(year, month, Math.min(date.getDate(), lastDay));
+}
+
+function monthsBetween(from: Date, to: Date): number {
+  let months =
+    (to.getFullYear() - from.getFullYear()) * 12 + to.getMonth() - from.getMonth();
+  if (addMonths(from, months) > to) months--;
+  return months;
 }
 
 // YAML `deadline: 2026-04-21` (unquoted) is parsed as a JS Date at UTC midnight,
