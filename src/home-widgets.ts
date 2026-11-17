@@ -210,15 +210,16 @@ function fileList(
   files: TFile[],
   meta: (file: TFile) => string | undefined,
   empty: string,
+  limit = LIST_LIMIT,
 ): void {
   if (files.length === 0) {
     el.createEl("p", { text: empty, cls: "home-widget-empty" });
     return;
   }
   const ul = el.createEl("ul", { cls: "dw-list" });
-  for (const file of files.slice(0, LIST_LIMIT)) listRow(ctx, ul, file, meta(file));
-  if (files.length > LIST_LIMIT) {
-    el.createDiv({ text: `+${files.length - LIST_LIMIT} more`, cls: "home-widget-more" });
+  for (const file of files.slice(0, limit)) listRow(ctx, ul, file, meta(file));
+  if (files.length > limit) {
+    el.createDiv({ text: `+${files.length - limit} more`, cls: "home-widget-more" });
   }
 }
 
@@ -430,6 +431,7 @@ const waiting: HomeWidget = {
         return [people.join(", "), `waiting since ${ago(file.stat.ctime)}`].filter(Boolean).join(" · ");
       },
       "Nothing pending.",
+      Infinity,
     );
   },
 };
